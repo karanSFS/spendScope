@@ -221,7 +221,7 @@ function resolveCategoryForRemote(record, categories = []) {
 /**
  * Builds the remote write set for one local entity.
  * Returns `{ writes, settingsPatch }`; `writes` is empty for local-only data.
- * `ctx`: { categories, timePeriodIds: Map, budgetModeIds: Map, loanMetrics }
+ * `ctx`: { categories, timePeriodIds: Map, timePeriodDays: Map, budgetModeIds: Map, loanMetrics }
  */
 export function buildRemoteWrites(entityType, record, ownerId, ctx = {}) {
   if (isLocalOnlyEntity(entityType, record)) {
@@ -240,19 +240,23 @@ export function buildRemoteWrites(entityType, record, ownerId, ctx = {}) {
       budgetModeIds.set(record.id, bmId);
 
       const updatedAt = record.updated_at || new Date().toISOString();
+      // week_start_day / month_start_day are NOT NULL with no default. Postgres
+      // validates NOT NULL on the proposed INSERT tuple of an upsert *before* it
+      // resolves the conflict, so they must always be sent. Re-send the values the
+      // mobile apps already stored (preloaded) so they are never overwritten.
+      const existingDays = (ctx.timePeriodDays || new Map()).get(record.id);
       const timePeriodRow = {
         id: tpId,
         user_id: ownerId,
         account_id: record.id,
         show_spendings: record.spending_period || "Monthly",
+        week_start_day: existingDays?.week_start_day || "Sunday",
+        month_start_day: Number.isFinite(Number(existingDays?.month_start_day))
+          ? Number(existingDays.month_start_day)
+          : 1,
         updated_at: updatedAt,
         deleted_at: null,
       };
-      if (!existingTp) {
-        // NOT NULL columns without defaults on the shared schema.
-        timePeriodRow.week_start_day = "Sunday";
-        timePeriodRow.month_start_day = 1;
-      }
 
       return {
         writes: [

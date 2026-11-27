@@ -139,21 +139,20 @@ async function applyWebSettings(client, patch) {
   if (updateError) throw updateError;
 }
 
-async function fetchSatelliteIdMap(client, table, ownerId) {
-  const rows = await fetchAllRows(client, table, ownerId, {
-    columns: "id, account_id",
-  });
-  const map = new Map();
+async function fetchSatelliteRows(client, table, ownerId, columns) {
+  const rows = await fetchAllRows(client, table, ownerId, { columns });
+  const byAccount = new Map();
   for (const row of rows) {
-    if (!map.has(row.account_id)) map.set(row.account_id, row.id);
+    if (!byAccount.has(row.account_id)) byAccount.set(row.account_id, row);
   }
-  return map;
+  return byAccount;
 }
 
 async function buildPushContext(ownerId, client, ops) {
   const ctx = {
     categories: [],
     timePeriodIds: new Map(),
+    timePeriodDays: new Map(),
     budgetModeIds: new Map(),
     loanMetrics: null,
   };
@@ -165,12 +164,25 @@ async function buildPushContext(ownerId, client, ops) {
     ctx.categories = await listEntities(ownerId, "categories");
   }
   if (upsertTypes.has("accounts")) {
-    const [timePeriodIds, budgetModeIds] = await Promise.all([
-      fetchSatelliteIdMap(client, "time_periods", ownerId),
-      fetchSatelliteIdMap(client, "budget_modes", ownerId),
+    const [timePeriods, budgetModes] = await Promise.all([
+      fetchSatelliteRows(
+        client,
+        "time_periods",
+        ownerId,
+        "id, account_id, week_start_day, month_start_day",
+      ),
+      fetchSatelliteRows(client, "budget_modes", ownerId, "id, account_id"),
     ]);
-    ctx.timePeriodIds = timePeriodIds;
-    ctx.budgetModeIds = budgetModeIds;
+    for (const [accountId, row] of timePeriods) {
+      ctx.timePeriodIds.set(accountId, row.id);
+      ctx.timePeriodDays.set(accountId, {
+        week_start_day: row.week_start_day,
+        month_start_day: row.month_start_day,
+      });
+    }
+    for (const [accountId, row] of budgetModes) {
+      ctx.budgetModeIds.set(accountId, row.id);
+    }
   }
   if (upsertTypes.has("loan_profiles")) {
     const { calculateLoanProfileMetrics } = await import("./calculatorEngine");

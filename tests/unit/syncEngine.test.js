@@ -21,6 +21,29 @@ const REMOTE_TABLES = [
   "carry_overs",
 ];
 
+const NOT_NULL_NO_DEFAULT = {
+  accounts: ["id", "name"],
+  categories: ["id", "name", "icon", "type"],
+  transactions: ["id", "account_id", "category_id", "amount"],
+  time_periods: ["id", "account_id", "show_spendings", "week_start_day", "month_start_day"],
+  budget_modes: ["id", "account_id"],
+  spend_buckets: ["id", "account_id", "bucket_name", "icon"],
+  spend_bucket_transactions: ["id", "bucket_id", "amount", "bucket_transaction_type"],
+  loans: ["id"],
+};
+
+/** Mirrors Postgres: NOT NULL is checked on the INSERT tuple even for ON CONFLICT DO UPDATE. */
+function violatesNotNull(table, payload) {
+  const missing = (NOT_NULL_NO_DEFAULT[table] || []).find(
+    (col) => payload[col] === undefined || payload[col] === null,
+  );
+  return missing
+    ? {
+        message: `null value in column "${missing}" of relation "${table}" violates not-null constraint`,
+      }
+    : null;
+}
+
 /** In-memory stand-in for the shared (user_id based) Supabase schema. */
 function createMockSupabase(initialRemote = {}, initialMetadata = {}) {
   const remote = {};
@@ -64,6 +87,8 @@ function createMockSupabase(initialRemote = {}, initialMetadata = {}) {
         return Promise.resolve({ data, error: null }).then(resolve, reject);
       },
       upsert(payload, opts) {
+        const nullError = violatesNotNull(table, payload);
+        if (nullError) return Promise.resolve({ error: nullError });
         calls.push({ op: "upsert", table, payload, opts });
         const key = opts?.onConflict || "id";
         const idx = remote[table].findIndex((r) => r[key] === payload[key]);

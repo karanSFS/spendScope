@@ -133,7 +133,7 @@ Advisor note: leaked-password protection is disabled in the dashboard (recommend
 | `buckets` / `bucket_transactions` / `loan_profiles` | `spend_buckets` / `spend_bucket_transactions` / `loans` | Renamed tables and columns (`name`↔`bucket_name`/`loan_name`, `image_key`↔`icon`, `position`↔`sort_order`, `note`↔`notes`, `principal_amount`↔`amount`, `account_name`↔`loan_account_number`) |
 | `accounts.is_default` | `accounts.is_current` | Pull normalises to exactly one default (earliest `created_at` wins on ties/none) |
 | `accounts.avatar_key` (`user_pf`, `user_pf1`…) | `avatar` (`avatar1`…) | `avatarN` = `AVATAR_KEYS[N-1]`; unknown mobile values are preserved in `remote_avatar` |
-| `accounts.spending_period` | `time_periods.show_spendings` | Satellite row; existing row IDs are looked up before upsert. `week_start_day='Sunday'` / `month_start_day=1` written **only** when creating a row |
+| `accounts.spending_period` | `time_periods.show_spendings` | Satellite row; existing row IDs are looked up before upsert. `week_start_day`/`month_start_day` are NOT NULL: always sent — the existing values are preloaded and re-sent, `Sunday`/`1` only for new rows |
 | `accounts.budget_mode/budget_amount/include_income` | `budget_modes.is_on/amount(text)/is_include_income` | Satellite row |
 | `categories.kind` / `icon_key` / `color` / `is_default` | `type` / `icon` / `chart_color` / `!is_custom` | Icon name table in `ICON_PAIRS`; `carryOver` shown with `money_transfer` and preserved (`remote_icon`) |
 | `transactions.kind` | `categories.type` | **ASSUMPTION:** income/expense is derived from the category's type |

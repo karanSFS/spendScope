@@ -176,7 +176,26 @@ describe("remoteSchema: push mapping", () => {
       },
     );
     expect(existing.writes[1].row.id).toBe("tp-1");
-    expect(existing.writes[1].row.week_start_day).toBeUndefined();
+    // NOT NULL columns are always sent (Postgres checks them before conflict resolution)
+    expect(existing.writes[1].row.week_start_day).toBe("Sunday");
+    expect(existing.writes[1].row.month_start_day).toBe(1);
+
+    const preserved = buildRemoteWrites(
+      "accounts",
+      { id: "acc", name: "Cash", spending_period: "Monthly" },
+      OWNER,
+      {
+        timePeriodIds: new Map([["acc", "tp-1"]]),
+        timePeriodDays: new Map([
+          ["acc", { week_start_day: "Monday", month_start_day: 5 }],
+        ]),
+        budgetModeIds: new Map([["acc", "bm-1"]]),
+      },
+    );
+    expect(preserved.writes[1].row).toMatchObject({
+      week_start_day: "Monday",
+      month_start_day: 5,
+    });
     expect(existing.writes[2].row.id).toBe("bm-1");
   });
 

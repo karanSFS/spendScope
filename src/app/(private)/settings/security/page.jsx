@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import AppLoader from "@/components/shared/AppLoader";
 import {
   HiOutlineLockClosed,
   HiOutlineShieldCheck,
@@ -174,7 +175,7 @@ export default function SecuritySettingsPage() {
       )}
 
       {loading ? (
-        <div className="h-32 rounded-[24px] bg-[var(--home-card)] border border-[var(--home-border)] animate-pulse" />
+        <AppLoader variant="compact" label="Loading security settings" />
       ) : lockState.enabled ? (
         <div className="space-y-4">
           <form

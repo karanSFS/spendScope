@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import AppLoader from "@/components/shared/AppLoader";
 import Link from "next/link";
 import {
   DndContext,
@@ -360,14 +361,7 @@ export default function SpendBucketPage() {
 
       {/* Buckets List */}
       {loading ? (
-        <div className="space-y-3">
-          {[1, 2].map((i) => (
-            <div
-              key={i}
-              className="h-32 rounded-[24px] bg-[var(--home-card)] border border-[var(--home-border)] animate-pulse"
-            />
-          ))}
-        </div>
+        <AppLoader variant="compact" label="Loading buckets" />
       ) : buckets.length === 0 ? (
         <EmptyStateCard
           icon={<HiOutlineArchiveBox className="w-6 h-6" />}

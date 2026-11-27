@@ -10,6 +10,7 @@ import {
 import useLoanProfiles from "@/hooks/useLoanProfiles";
 import { useCalcCurrency, useShareCalc, CalcHeader, CalcCard, CalcSummaryTable, ShareIconButton, CalcToast, sanitizeDecimal, sanitizeInt } from "./CalculatorShell";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
+import AppLoader from "@/components/shared/AppLoader";
 import {
   calculateLoanEmi,
   calculateLoanProfileMetrics,
@@ -552,8 +553,8 @@ export default function LoanProfileCalculator({ onBack }) {
       <CalcToast message={toast} />
 
       {loading ? (
-        <CalcCard className="p-8 text-center text-xs text-[var(--home-text-muted)]">
-          Loading saved loan profiles...
+        <CalcCard>
+          <AppLoader variant="compact" label="Loading saved loan profiles" />
         </CalcCard>
       ) : loans.length === 0 ? (
         <CalcCard className="p-8 text-center space-y-3">

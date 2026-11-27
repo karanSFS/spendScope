@@ -30,22 +30,10 @@ import {
 } from "react-icons/hi2";
 import { useAccounts } from "@/hooks/useAccounts";
 import { getCurrencySymbol } from "@/utils/currencies";
+import AppLoader from "@/components/shared/AppLoader";
 
 function CalcToolSkeleton() {
-  return (
-    <div className="space-y-4 animate-pulse" aria-busy="true">
-      <div className="h-10 rounded-2xl bg-[var(--home-track)]/70 w-2/3 mx-auto" />
-      <div className="rounded-3xl border border-[var(--home-border)] bg-[var(--home-card)] p-5 space-y-4">
-        <div className="h-10 rounded-xl bg-[var(--home-track)]/60" />
-        <div className="h-10 rounded-xl bg-[var(--home-track)]/60" />
-        <div className="h-10 rounded-xl bg-[var(--home-track)]/60" />
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="h-12 rounded-2xl bg-[var(--home-track)]/60" />
-        <div className="h-12 rounded-2xl bg-[var(--home-accent)]/30" />
-      </div>
-    </div>
-  );
+  return <AppLoader variant="section" label="Opening calculator" />;
 }
 
 const dynamicCalc = (loader) =>
@@ -707,11 +695,7 @@ function CalculatorHubContent() {
 export default function CalculatorsPage() {
   return (
     <Suspense
-      fallback={
-        <div className="p-8 text-center text-xs text-[var(--home-text-muted)]">
-          Loading calculators...
-        </div>
-      }
+      fallback={<AppLoader variant="section" label="Loading calculators" />}
     >
       <CalculatorHubContent />
     </Suspense>

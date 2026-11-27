@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import AppLoader from "@/components/shared/AppLoader";
 import {
   DndContext,
   closestCenter,
@@ -288,14 +289,7 @@ export default function CategoriesPage() {
       )}
 
       {loading ? (
-        <div className="space-y-3">
-          {[1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              className="h-16 rounded-[20px] bg-[var(--home-card)] border border-[var(--home-border)] animate-pulse"
-            />
-          ))}
-        </div>
+        <AppLoader variant="compact" label="Loading categories" />
       ) : activeList.length === 0 ? (
         <EmptyStateCard
           title={`No ${activeKind} categories`}

@@ -7,6 +7,7 @@ import {
   HiOutlineBackspace,
 } from "react-icons/hi2";
 import useAuth from "@/hooks/useAuth";
+import AppLoader from "@/components/shared/AppLoader";
 import {
   getAppLockState,
   verifyPinAttempt,
@@ -207,11 +208,7 @@ export default function AppLockGate({ children }) {
   };
 
   if (checking) {
-    return (
-      <div className="min-h-screen bg-[var(--home-background)] flex items-center justify-center text-xs text-[var(--home-text-muted)]">
-        Checking device security…
-      </div>
-    );
+    return <AppLoader label="Checking device security" />;
   }
 
   if (locked) {

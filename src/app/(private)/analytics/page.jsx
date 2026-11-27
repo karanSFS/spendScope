@@ -14,6 +14,15 @@ import useCategories from "@/hooks/useCategories";
 import { formatMoney } from "@/utils/currencies";
 import { HOME_CATEGORY_PALETTE } from "@/lib/budgetMath";
 import CategoryIcon from "@/components/shared/CategoryIcon";
+import AppLoader from "@/components/shared/AppLoader";
+
+function ChartLoader() {
+  return (
+    <div className="w-full h-full flex items-center justify-center">
+      <AppLoader variant="compact" label="Loading chart" />
+    </div>
+  );
+}
 
 const MonthlyDonutChart = dynamic(
   () =>
@@ -22,9 +31,7 @@ const MonthlyDonutChart = dynamic(
     ),
   {
     ssr: false,
-    loading: () => (
-      <div className="w-full h-full rounded-2xl bg-[var(--home-track)]/40 animate-pulse" />
-    ),
+    loading: () => <ChartLoader />,
   },
 );
 
@@ -35,9 +42,7 @@ const YearlyCashflowBarChart = dynamic(
     ),
   {
     ssr: false,
-    loading: () => (
-      <div className="w-full h-full rounded-2xl bg-[var(--home-track)]/40 animate-pulse" />
-    ),
+    loading: () => <ChartLoader />,
   },
 );
 

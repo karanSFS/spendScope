@@ -38,6 +38,7 @@ import TransactionFiltersDrawer from "@/components/transactions/TransactionFilte
 import ExportModal from "@/components/transactions/ExportModal";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import EmptyStateCard from "@/components/shared/EmptyStateCard";
+import AppLoader from "@/components/shared/AppLoader";
 
 const PAGE_SIZE = 200;
 
@@ -437,14 +438,7 @@ function TransactionsContent() {
 
       {/* Ledger List */}
       {loading ? (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="h-16 rounded-2xl bg-[var(--home-card)] border border-[var(--home-border)] animate-pulse"
-            />
-          ))}
-        </div>
+        <AppLoader variant="compact" label="Loading transactions" />
       ) : isHiddenMasked && filteredTransactions.length > 0 ? (
         <div className="rounded-[24px] border border-dashed border-[var(--home-border)] bg-[var(--home-card)] p-10 text-center space-y-3">
           <h3 className="font-display text-lg">Transactions Hidden</h3>
@@ -581,11 +575,7 @@ function TransactionsContent() {
 export default function TransactionsPage() {
   return (
     <Suspense
-      fallback={
-        <div className="p-8 text-center text-sm text-[var(--home-text-muted)]">
-          Loading transactions…
-        </div>
-      }
+      fallback={<AppLoader variant="section" label="Loading transactions" />}
     >
       <TransactionsContent />
     </Suspense>

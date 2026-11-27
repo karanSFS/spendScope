@@ -18,6 +18,7 @@ import BucketFormModal from "@/components/buckets/BucketFormModal";
 import BucketEntryModal from "@/components/buckets/BucketEntryModal";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import EmptyStateCard from "@/components/shared/EmptyStateCard";
+import AppLoader from "@/components/shared/AppLoader";
 
 export default function SingleBucketPage() {
   const params = useParams();
@@ -44,11 +45,7 @@ export default function SingleBucketPage() {
   const [deleting, setDeleting] = useState(false);
 
   if (loading) {
-    return (
-      <div className="p-8 text-center text-sm text-[var(--home-text-muted)]">
-        Loading bucket…
-      </div>
-    );
+    return <AppLoader variant="section" label="Loading bucket" />;
   }
 
   if (!bucket) {

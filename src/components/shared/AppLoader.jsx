@@ -1,10 +1,129 @@
 import React from "react";
 
 /**
- * Full-screen branded loader shown while the persisted app state hydrates.
- * Pure markup + CSS (no hooks / redux) so it renders safely before providers are ready.
+ * Branded SpendScope loaders. Pure markup + CSS (no hooks / redux) so they render
+ * safely before providers are ready and inside Suspense / dynamic() fallbacks.
+ *
+ * variant:
+ *  - "page"    full-screen (app hydration)
+ *  - "section" tall centered block inside a page (route / Suspense fallbacks)
+ *  - "compact" small inline block (lists, charts, lazy tool panels)
  */
-export default function AppLoader({ label = "Getting your finances ready" }) {
+
+function LoaderMark({ ring = "h-28 w-28", card = "h-20 w-20 rounded-[28px]", icon = "h-11 w-11" }) {
+  return (
+    <div className={`relative ${ring} flex items-center justify-center`}>
+      <span
+        aria-hidden="true"
+        className="ss-pulse-ring absolute inset-0 rounded-full border-2"
+        style={{ borderColor: "var(--home-accent)" }}
+      />
+      <span
+        aria-hidden="true"
+        className="ss-pulse-ring absolute inset-0 rounded-full border"
+        style={{ borderColor: "var(--home-accent)", animationDelay: "0.9s" }}
+      />
+      <span
+        aria-hidden="true"
+        className="ss-spin absolute inset-0 rounded-full"
+        style={{
+          background:
+            "conic-gradient(from 0deg, transparent 0deg, transparent 230deg, var(--home-accent) 330deg, transparent 360deg)",
+          WebkitMask:
+            "radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px))",
+          mask: "radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px))",
+        }}
+      />
+      <div
+        className={`relative ${card} bg-[var(--home-card)] border border-[var(--home-border)] shadow-lg flex items-center justify-center`}
+      >
+        <svg
+          viewBox="0 0 36 32"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          className={icon}
+          aria-hidden="true"
+        >
+          <rect
+            x="5"
+            y="2"
+            width="23"
+            height="11"
+            rx="3"
+            fill="var(--home-accent)"
+            fillOpacity="0.45"
+            stroke="white"
+            strokeWidth="1"
+          />
+          <rect x="2" y="7" width="32" height="23" rx="6" fill="var(--home-accent)" />
+          <path
+            d="M3 13.5C3 11 5 9 8 9H28C31 9 33 11 33 13.5"
+            stroke="white"
+            strokeOpacity="0.3"
+            strokeWidth="1.2"
+          />
+          <path
+            d="M23 13.5H32.5C33.6 13.5 34.5 14.4 34.5 15.5V21.5C34.5 22.6 33.6 23.5 32.5 23.5H23C21.6 23.5 20.5 22.4 20.5 21V16C20.5 14.6 21.6 13.5 23 13.5Z"
+            fill="var(--home-accent)"
+            stroke="white"
+            strokeWidth="1.2"
+          />
+          <circle cx="26.5" cy="18.5" r="1.8" fill="white" />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function Coins({ size = "h-3.5 w-3.5" }) {
+  return (
+    <div className="flex items-end gap-2.5" aria-hidden="true">
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          className={`ss-coin ${size} rounded-full`}
+          style={{
+            animationDelay: `${i * 0.18}s`,
+            background: i === 1 ? "var(--home-income)" : "var(--home-accent)",
+            boxShadow: "inset 0 -2px 0 rgba(0,0,0,0.15)",
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+export default function AppLoader({
+  label = "Getting your finances ready",
+  variant = "page",
+}) {
+  if (variant !== "page") {
+    const isSection = variant === "section";
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        aria-label={label}
+        data-testid="app-loader-inline"
+        className={`w-full flex flex-col items-center justify-center text-center ss-fade-up ${
+          isSection ? "min-h-[50vh] py-12" : "py-10"
+        }`}
+      >
+        <LoaderMark
+          ring={isSection ? "h-20 w-20" : "h-14 w-14"}
+          card={isSection ? "h-14 w-14 rounded-[20px]" : "h-10 w-10 rounded-2xl"}
+          icon={isSection ? "h-8 w-8" : "h-6 w-6"}
+        />
+        <p className="mt-4 text-xs sm:text-sm font-medium text-[var(--home-text-secondary)]">
+          {label}
+        </p>
+        <div className="mt-3">
+          <Coins size="h-2.5 w-2.5" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       role="status"
@@ -13,7 +132,6 @@ export default function AppLoader({ label = "Getting your finances ready" }) {
       data-testid="app-loader"
       className="relative min-h-screen w-full overflow-hidden flex flex-col items-center justify-center px-6 text-center bg-[var(--home-background)] text-[var(--home-text)]"
     >
-      {/* Ambient glows */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full blur-3xl opacity-30"
@@ -26,89 +144,17 @@ export default function AppLoader({ label = "Getting your finances ready" }) {
       />
 
       <div className="relative flex flex-col items-center ss-fade-up">
-        {/* Logo with orbit ring */}
-        <div className="relative h-28 w-28 flex items-center justify-center">
-          <span
-            aria-hidden="true"
-            className="ss-pulse-ring absolute inset-0 rounded-full border-2"
-            style={{ borderColor: "var(--home-accent)" }}
-          />
-          <span
-            aria-hidden="true"
-            className="ss-pulse-ring absolute inset-0 rounded-full border"
-            style={{ borderColor: "var(--home-accent)", animationDelay: "0.9s" }}
-          />
-          <span
-            aria-hidden="true"
-            className="ss-spin absolute inset-0 rounded-full"
-            style={{
-              background:
-                "conic-gradient(from 0deg, transparent 0deg, transparent 230deg, var(--home-accent) 330deg, transparent 360deg)",
-              WebkitMask:
-                "radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px))",
-              mask: "radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px))",
-            }}
-          />
-          <div className="relative h-20 w-20 rounded-[28px] bg-[var(--home-card)] border border-[var(--home-border)] shadow-lg flex items-center justify-center">
-            <svg
-              viewBox="0 0 36 32"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-11 w-11"
-              aria-hidden="true"
-            >
-              <rect
-                x="5"
-                y="2"
-                width="23"
-                height="11"
-                rx="3"
-                fill="var(--home-accent)"
-                fillOpacity="0.45"
-                stroke="white"
-                strokeWidth="1"
-              />
-              <rect x="2" y="7" width="32" height="23" rx="6" fill="var(--home-accent)" />
-              <path
-                d="M3 13.5C3 11 5 9 8 9H28C31 9 33 11 33 13.5"
-                stroke="white"
-                strokeOpacity="0.3"
-                strokeWidth="1.2"
-              />
-              <path
-                d="M23 13.5H32.5C33.6 13.5 34.5 14.4 34.5 15.5V21.5C34.5 22.6 33.6 23.5 32.5 23.5H23C21.6 23.5 20.5 22.4 20.5 21V16C20.5 14.6 21.6 13.5 23 13.5Z"
-                fill="var(--home-accent)"
-                stroke="white"
-                strokeWidth="1.2"
-              />
-              <circle cx="26.5" cy="18.5" r="1.8" fill="white" />
-            </svg>
-          </div>
-        </div>
+        <LoaderMark />
 
-        {/* Brand */}
         <h1 className="mt-8 font-display text-3xl sm:text-4xl tracking-tight">
           Spend<span style={{ color: "var(--home-accent)" }}>Scope</span>
         </h1>
         <p className="mt-2 text-sm text-[var(--home-text-secondary)]">{label}</p>
 
-        {/* Bouncing coins */}
-        <div className="mt-6 flex items-end gap-2.5" aria-hidden="true">
-          {[0, 1, 2].map((i) => (
-            <span
-              key={i}
-              className="ss-coin h-3.5 w-3.5 rounded-full"
-              style={{
-                animationDelay: `${i * 0.18}s`,
-                background:
-                  i === 1 ? "var(--home-income)" : "var(--home-accent)",
-                boxShadow: "inset 0 -2px 0 rgba(0,0,0,0.15)",
-              }}
-            />
-          ))}
+        <div className="mt-6">
+          <Coins />
         </div>
 
-        {/* Progress sweep */}
         <div
           aria-hidden="true"
           className="mt-7 h-1.5 w-48 overflow-hidden rounded-full bg-[var(--home-track)]"

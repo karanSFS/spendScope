@@ -30,6 +30,7 @@ import AccountSwitcherModal from "@/components/shared/AccountSwitcherModal";
 import TransactionFormModal from "@/components/transactions/TransactionFormModal";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import EmptyStateCard from "@/components/shared/EmptyStateCard";
+import AppLoader from "@/components/shared/AppLoader";
 
 export default function DashboardPage() {
   const {
@@ -414,14 +415,7 @@ export default function DashboardPage() {
           </div>
 
           {txLoading ? (
-            <div className="space-y-3 py-4">
-              {[1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="h-14 rounded-2xl bg-[var(--home-track)]/60 animate-pulse"
-                />
-              ))}
-            </div>
+            <AppLoader variant="compact" label="Loading transactions" />
           ) : isHiddenMasked && periodTransactions.length > 0 ? (
             <div className="rounded-2xl border border-dashed border-[var(--home-border)] bg-[var(--home-background)] p-8 text-center space-y-3">
               <p className="text-sm font-semibold text-[var(--home-text)]">

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, Suspense } from "react";
+import AppLoader from "@/components/shared/AppLoader";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
@@ -454,11 +455,7 @@ function SettingsContent() {
 export default function SettingsPage() {
   return (
     <Suspense
-      fallback={
-        <div className="p-8 text-center text-sm text-[var(--home-text-muted)]">
-          Loading settings…
-        </div>
-      }
+      fallback={<AppLoader variant="section" label="Loading settings" />}
     >
       <SettingsContent />
     </Suspense>

@@ -1,5 +1,5 @@
-import AppLoader from "@/components/shared/AppLoader";
+import PageSkeleton from "@/components/shared/PageSkeleton";
 
 export default function PrivateLoading() {
-  return <AppLoader variant="section" label="Loading" />;
+  return <PageSkeleton label="Loading" />;
 }

@@ -30,7 +30,14 @@ import AccountSwitcherModal from "@/components/shared/AccountSwitcherModal";
 import TransactionFormModal from "@/components/transactions/TransactionFormModal";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import EmptyStateCard from "@/components/shared/EmptyStateCard";
-import AppLoader from "@/components/shared/AppLoader";
+import {
+  Skeleton,
+  SkeletonTitle,
+  SkeletonHero,
+  SkeletonFilterBar,
+  SkeletonBars,
+  SkeletonList,
+} from "@/components/shared/Skeleton";
 
 export default function DashboardPage() {
   const {
@@ -39,6 +46,7 @@ export default function DashboardPage() {
     activeAccountId,
     switchAccount,
     createAccount,
+    loading: accountsLoading,
   } = useAccounts();
 
   const {
@@ -49,7 +57,15 @@ export default function DashboardPage() {
     deleteTransaction,
   } = useTransactions({ accountId: activeAccountId });
 
-  const { categories, createCategory } = useCategories();
+  const {
+    categories,
+    createCategory,
+    loading: catsLoading,
+  } = useCategories();
+
+  // Skeletons until accounts/transactions/categories have arrived.
+  const headerLoading = accountsLoading;
+  const dataLoading = accountsLoading || txLoading || catsLoading;
 
   const currencyCode = activeAccount?.currency_code || "INR";
 
@@ -164,6 +180,13 @@ export default function DashboardPage() {
       {/* Header Row */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
+          {headerLoading ? (
+            <>
+              <Skeleton className="h-[50px] w-[50px] shrink-0" rounded="rounded-full" />
+              <SkeletonTitle />
+            </>
+          ) : (
+          <>
           <button
             type="button"
             onClick={() => setAccountModalOpen(true)}
@@ -196,6 +219,8 @@ export default function DashboardPage() {
                 : ""}
             </p>
           </div>
+          </>
+          )}
         </div>
 
         <div className="flex items-center gap-2.5">
@@ -241,6 +266,9 @@ export default function DashboardPage() {
       </div>
 
       {/* Period Filter & Navigation */}
+      {headerLoading ? (
+        <SkeletonFilterBar />
+      ) : (
       <PeriodFilterBar
         period={period}
         onPeriodChange={(next) => {
@@ -254,8 +282,12 @@ export default function DashboardPage() {
         customRange={customRange}
         onCustomRangeChange={setCustomRange}
       />
+      )}
 
       {/* Hero Summary Card */}
+      {dataLoading ? (
+        <SkeletonHero />
+      ) : (
       <section className="rounded-[24px] border border-[var(--home-border)] bg-[var(--home-card)] p-5 sm:p-7 space-y-5 shadow-2xs">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
@@ -329,6 +361,7 @@ export default function DashboardPage() {
           </div>
         )}
       </section>
+      )}
 
       {/* Main 2-Column Content */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -346,7 +379,9 @@ export default function DashboardPage() {
             </Link>
           </div>
 
-          {summary.categoryBreakdown.length === 0 ? (
+          {dataLoading ? (
+            <SkeletonBars rows={4} label="Loading spending breakdown" />
+          ) : summary.categoryBreakdown.length === 0 ? (
             <p className="text-xs sm:text-sm text-[var(--home-text-muted)] py-6 text-center">
               No expenses recorded in this period yet.
             </p>
@@ -414,8 +449,8 @@ export default function DashboardPage() {
             </Link>
           </div>
 
-          {txLoading ? (
-            <AppLoader variant="compact" label="Loading transactions" />
+          {dataLoading ? (
+            <SkeletonList rows={5} label="Loading transactions" />
           ) : isHiddenMasked && periodTransactions.length > 0 ? (
             <div className="rounded-2xl border border-dashed border-[var(--home-border)] bg-[var(--home-background)] p-8 text-center space-y-3">
               <p className="text-sm font-semibold text-[var(--home-text)]">

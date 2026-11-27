@@ -191,6 +191,28 @@ span {
   }
 }
 
+@keyframes ss-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.ss-skeleton {
+  background-color: var(--home-track);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--home-card) 70%, transparent) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: ss-shimmer 1.6s ease-in-out infinite;
+}
+
 .ss-spin {
   animation: ss-spin 1.6s linear infinite;
 }
@@ -211,6 +233,10 @@ span {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .ss-skeleton {
+    animation: none;
+    background-image: none;
+  }
   .ss-spin,
   .ss-float,
   .ss-pulse-ring,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSelector } from "react-redux";
 import {
   getTransactions as fetchTransactionsApi,
@@ -9,6 +9,7 @@ import {
   deleteTransaction as deleteTransactionApi,
 } from "@/services/transactionsService";
 import { subscribeDataChanged } from "@/lib/localDb";
+import { useDataReady } from "@/lib/dataReady";
 
 export const useTransactions = (options = {}) => {
   const userId = useSelector((state) => state?.authSlice?.userId) || null;
@@ -21,9 +22,13 @@ export const useTransactions = (options = {}) => {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const dataReady = useDataReady();
+  const loadedKeyRef = useRef(null);
 
   const getTransactions = useCallback(async () => {
-    setLoading(true);
+    // Skeleton only for the first load of this owner/account; later refreshes are silent.
+    const key = `${userId}|${accountId}`;
+    if (loadedKeyRef.current !== key) setLoading(true);
     setError(null);
     try {
       const data = await fetchTransactionsApi({
@@ -34,6 +39,7 @@ export const useTransactions = (options = {}) => {
     } catch (err) {
       setError(err?.message || "Failed to load transactions.");
     } finally {
+      loadedKeyRef.current = key;
       setLoading(false);
     }
   }, [userId, accountId]);
@@ -158,7 +164,7 @@ export const useTransactions = (options = {}) => {
 
   return {
     transactions,
-    loading,
+    loading: loading || !dataReady,
     error,
     totalIncome,
     totalExpense,

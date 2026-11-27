@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { persistor } from "@/redux";
 import { setActiveAccountId } from "@/redux/slices/appSlice";
@@ -12,6 +12,7 @@ import {
   transferBetweenAccounts as transferBetweenAccountsSvc,
 } from "@/services/accountsService";
 import { subscribeDataChanged } from "@/lib/localDb";
+import { useDataReady } from "@/lib/dataReady";
 
 export const useAccounts = () => {
   const dispatch = useDispatch();
@@ -25,9 +26,12 @@ export const useAccounts = () => {
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const dataReady = useDataReady();
+  const loadedKeyRef = useRef(null);
 
   const refreshAccounts = useCallback(async () => {
-    setLoading(true);
+    const key = String(userId);
+    if (loadedKeyRef.current !== key) setLoading(true);
     setError(null);
     try {
       const rows = await listAccounts(userId, defaultCurrency);
@@ -39,6 +43,7 @@ export const useAccounts = () => {
     } catch (err) {
       setError(err?.message || "Failed to load accounts.");
     } finally {
+      loadedKeyRef.current = key;
       setLoading(false);
     }
   }, [userId, defaultCurrency, activeAccountId, dispatch]);
@@ -132,7 +137,7 @@ export const useAccounts = () => {
     accounts,
     activeAccount,
     activeAccountId: activeAccount?.id || activeAccountId,
-    loading,
+    loading: loading || !dataReady,
     error,
     refreshAccounts,
     switchAccount,

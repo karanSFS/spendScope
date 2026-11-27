@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import AppLoader from "@/components/shared/AppLoader";
+import { SkeletonHero, SkeletonGrid } from "@/components/shared/Skeleton";
 import Link from "next/link";
 import {
   DndContext,
@@ -194,19 +194,20 @@ function SortableBucketCard({
 }
 
 export default function SpendBucketPage() {
-  const { activeAccount } = useAccounts();
+  const { activeAccount, loading: accountsLoading } = useAccounts();
   const currencyCode = activeAccount?.currency_code || "INR";
 
   const {
     buckets,
     summary,
-    loading,
+    loading: bucketsLoading,
     createBucket,
     updateBucket,
     deleteBucket,
     reorderBuckets,
   } = useBuckets();
 
+  const loading = bucketsLoading || accountsLoading;
   const [tipDismissed, setTipDismissed] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
@@ -323,6 +324,9 @@ export default function SpendBucketPage() {
       )}
 
       {/* Aggregate Summary Card */}
+      {loading ? (
+        <SkeletonHero />
+      ) : (
       <section className="rounded-[24px] border border-[var(--home-border)] bg-[var(--home-card)] p-5 sm:p-6 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
@@ -358,10 +362,16 @@ export default function SpendBucketPage() {
         </div>
         <ProportionalBar leftPct={aggLeftPct} rightPct={aggRightPct} height={10} />
       </section>
+      )}
 
       {/* Buckets List */}
       {loading ? (
-        <AppLoader variant="compact" label="Loading buckets" />
+        <SkeletonGrid
+          items={4}
+          label="Loading buckets"
+          className="grid grid-cols-1 md:grid-cols-2 gap-4"
+          itemClassName="h-36"
+        />
       ) : buckets.length === 0 ? (
         <EmptyStateCard
           icon={<HiOutlineArchiveBox className="w-6 h-6" />}

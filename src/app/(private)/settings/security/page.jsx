@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import AppLoader from "@/components/shared/AppLoader";
+import { SkeletonCard, Skeleton } from "@/components/shared/Skeleton";
 import {
   HiOutlineLockClosed,
   HiOutlineShieldCheck,
@@ -175,7 +175,11 @@ export default function SecuritySettingsPage() {
       )}
 
       {loading ? (
-        <AppLoader variant="compact" label="Loading security settings" />
+        <SkeletonCard className="p-5 sm:p-6 space-y-4">
+          <Skeleton className="h-5 w-48" />
+          <Skeleton className="h-3.5 w-full max-w-md" />
+          <Skeleton className="h-11 w-full max-w-xs" rounded="rounded-full" />
+        </SkeletonCard>
       ) : lockState.enabled ? (
         <div className="space-y-4">
           <form

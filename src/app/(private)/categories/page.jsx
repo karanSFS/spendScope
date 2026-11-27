@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import AppLoader from "@/components/shared/AppLoader";
+import { SkeletonGrid } from "@/components/shared/Skeleton";
 import {
   DndContext,
   closestCenter,
@@ -289,7 +289,12 @@ export default function CategoriesPage() {
       )}
 
       {loading ? (
-        <AppLoader variant="compact" label="Loading categories" />
+        <SkeletonGrid
+          items={8}
+          label="Loading categories"
+          className="grid grid-cols-1 md:grid-cols-2 gap-3"
+          itemClassName="h-[72px]"
+        />
       ) : activeList.length === 0 ? (
         <EmptyStateCard
           title={`No ${activeKind} categories`}

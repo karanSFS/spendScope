@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSelector } from "react-redux";
 import {
   listBuckets,
@@ -15,6 +15,7 @@ import {
   deleteBucketEntry as deleteBucketEntrySvc,
 } from "@/services/bucketsService";
 import { subscribeDataChanged } from "@/lib/localDb";
+import { useDataReady } from "@/lib/dataReady";
 
 export const useBuckets = (explicitAccountId) => {
   const userId = useSelector((state) => state?.authSlice?.userId) || null;
@@ -26,14 +27,17 @@ export const useBuckets = (explicitAccountId) => {
   const [buckets, setBuckets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const dataReady = useDataReady();
+  const loadedKeyRef = useRef(null);
 
   const refreshBuckets = useCallback(async () => {
     if (!accountId) {
+      // No active account yet: accounts are still loading, keep skeleton up.
       setBuckets([]);
-      setLoading(false);
       return;
     }
-    setLoading(true);
+    const key = `${userId}|${accountId}`;
+    if (loadedKeyRef.current !== key) setLoading(true);
     setError(null);
     try {
       const rows = await listBuckets(userId, accountId);
@@ -41,6 +45,7 @@ export const useBuckets = (explicitAccountId) => {
     } catch (err) {
       setError(err?.message || "Failed to load buckets.");
     } finally {
+      loadedKeyRef.current = key;
       setLoading(false);
     }
   }, [userId, accountId]);
@@ -123,7 +128,7 @@ export const useBuckets = (explicitAccountId) => {
   return {
     buckets,
     summary,
-    loading,
+    loading: loading || !dataReady,
     error,
     refreshBuckets,
     createBucket,
@@ -139,6 +144,8 @@ export const useBucketDetails = (bucketId) => {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const dataReady = useDataReady();
+  const loadedKeyRef = useRef(null);
 
   const refresh = useCallback(async () => {
     if (!bucketId) {
@@ -147,7 +154,8 @@ export const useBucketDetails = (bucketId) => {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    const key = `${userId}|${bucketId}`;
+    if (loadedKeyRef.current !== key) setLoading(true);
     setError(null);
     try {
       const [found, rows] = await Promise.all([
@@ -159,6 +167,7 @@ export const useBucketDetails = (bucketId) => {
     } catch (err) {
       setError(err?.message || "Failed to load bucket.");
     } finally {
+      loadedKeyRef.current = key;
       setLoading(false);
     }
   }, [bucketId, userId]);
@@ -223,7 +232,7 @@ export const useBucketDetails = (bucketId) => {
   return {
     bucket,
     entries,
-    loading,
+    loading: loading || !dataReady,
     error,
     refresh,
     updateBucket,

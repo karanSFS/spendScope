@@ -38,7 +38,8 @@ import TransactionFiltersDrawer from "@/components/transactions/TransactionFilte
 import ExportModal from "@/components/transactions/ExportModal";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import EmptyStateCard from "@/components/shared/EmptyStateCard";
-import AppLoader from "@/components/shared/AppLoader";
+import PageSkeleton from "@/components/shared/PageSkeleton";
+import { Skeleton, SkeletonList } from "@/components/shared/Skeleton";
 
 const PAGE_SIZE = 200;
 
@@ -118,15 +119,24 @@ const TransactionRow = memo(function TransactionRow({
 
 function TransactionsContent() {
   const searchParams = useSearchParams();
-  const { activeAccount, activeAccountId } = useAccounts();
+  const {
+    activeAccount,
+    activeAccountId,
+    loading: accountsLoading,
+  } = useAccounts();
   const {
     transactions,
-    loading,
+    loading: txLoading,
     addTransaction,
     updateTransaction,
     deleteTransaction,
   } = useTransactions({ accountId: activeAccountId });
-  const { categories, createCategory } = useCategories();
+  const {
+    categories,
+    createCategory,
+    loading: catsLoading,
+  } = useCategories();
+  const loading = accountsLoading || txLoading || catsLoading;
 
   const currencyCode = activeAccount?.currency_code || "INR";
 
@@ -414,6 +424,13 @@ function TransactionsContent() {
         </div>
 
         {/* Count + In / Out summary pills */}
+        {loading ? (
+          <div className="flex flex-wrap items-center gap-2" aria-hidden="true">
+            <Skeleton className="h-6 w-20" rounded="rounded-full" />
+            <Skeleton className="h-6 w-24" rounded="rounded-full" />
+            <Skeleton className="h-6 w-24" rounded="rounded-full" />
+          </div>
+        ) : (
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span className="px-3 py-1 rounded-full bg-[var(--home-track)] text-[var(--home-text)] font-semibold">
             {filteredTransactions.length}{" "}
@@ -434,11 +451,14 @@ function TransactionsContent() {
             </span>
           )}
         </div>
+        )}
       </div>
 
       {/* Ledger List */}
       {loading ? (
-        <AppLoader variant="compact" label="Loading transactions" />
+        <div className="rounded-[24px] border border-[var(--home-border)] bg-[var(--home-card)] px-4 sm:px-5 py-2">
+          <SkeletonList rows={7} label="Loading transactions" />
+        </div>
       ) : isHiddenMasked && filteredTransactions.length > 0 ? (
         <div className="rounded-[24px] border border-dashed border-[var(--home-border)] bg-[var(--home-card)] p-10 text-center space-y-3">
           <h3 className="font-display text-lg">Transactions Hidden</h3>
@@ -575,7 +595,7 @@ function TransactionsContent() {
 export default function TransactionsPage() {
   return (
     <Suspense
-      fallback={<AppLoader variant="section" label="Loading transactions" />}
+      fallback={<PageSkeleton label="Loading transactions" />}
     >
       <TransactionsContent />
     </Suspense>

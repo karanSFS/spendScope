@@ -33,6 +33,9 @@ import AvatarBadge from "@/components/shared/AvatarBadge";
 import AccountSwitcherModal from "@/components/shared/AccountSwitcherModal";
 import useAuth from "@/hooks/useAuth";
 import useAccounts from "@/hooks/useAccounts";
+import { useDataReady } from "@/lib/dataReady";
+import PageSkeleton from "@/components/shared/PageSkeleton";
+import { Skeleton } from "@/components/shared/Skeleton";
 import { changeTheme } from "@/redux/slices/themeSlice";
 import { toggleSidebarCollapsed } from "@/redux/slices/appSlice";
 import { syncNow, getGuestMigrationSummary } from "@/lib/syncEngine";
@@ -100,7 +103,9 @@ export default function AppShell({ children }) {
     activeAccountId,
     switchAccount,
     createAccount,
+    loading: accountsLoading,
   } = useAccounts();
+  const dataReady = useDataReady();
 
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [accountModalOpen, setAccountModalOpen] = useState(false);
@@ -337,6 +342,12 @@ export default function AppShell({ children }) {
 
             {/* Account Switcher Pill */}
             <div className="relative min-w-0 max-w-full" ref={accountRef}>
+              {accountsLoading ? (
+                <Skeleton
+                  className="h-10 w-[150px] sm:w-[200px]"
+                  rounded="rounded-full"
+                />
+              ) : (
               <button
                 type="button"
                 onClick={() => setAccountMenuOpen((o) => !o)}
@@ -356,6 +367,7 @@ export default function AppShell({ children }) {
                 </span>
                 <HiOutlineChevronDown className="w-3.5 h-3.5 text-[var(--home-text-muted)] shrink-0" />
               </button>
+              )}
 
               {accountMenuOpen && (
                 <div className="absolute left-0 top-full mt-2 w-64 rounded-2xl border border-[var(--home-border)] bg-[var(--home-card)] shadow-xl p-1.5 z-50">
@@ -591,7 +603,7 @@ export default function AppShell({ children }) {
 
         {/* PAGE CONTENT */}
         <main className="flex-1 w-full max-w-[1280px] mx-auto px-3 sm:px-6 lg:px-8 py-5 pb-24 lg:pb-10">
-          {children}
+          {dataReady ? children : <PageSkeleton label="Loading your data" />}
         </main>
       </div>
 

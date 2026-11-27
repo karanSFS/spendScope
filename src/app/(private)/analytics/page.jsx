@@ -14,13 +14,18 @@ import useCategories from "@/hooks/useCategories";
 import { formatMoney } from "@/utils/currencies";
 import { HOME_CATEGORY_PALETTE } from "@/lib/budgetMath";
 import CategoryIcon from "@/components/shared/CategoryIcon";
-import AppLoader from "@/components/shared/AppLoader";
+import {
+  Skeleton,
+  SkeletonBars,
+  SkeletonStats,
+  SkeletonRegion,
+} from "@/components/shared/Skeleton";
 
 function ChartLoader() {
   return (
-    <div className="w-full h-full flex items-center justify-center">
-      <AppLoader variant="compact" label="Loading chart" />
-    </div>
+    <SkeletonRegion label="Loading chart" className="w-full h-full">
+      <Skeleton className="w-full h-full min-h-[200px]" rounded="rounded-2xl" />
+    </SkeletonRegion>
   );
 }
 
@@ -62,9 +67,16 @@ const MONTH_LABELS = [
 ];
 
 export default function AnalyticsPage() {
-  const { activeAccount, activeAccountId } = useAccounts();
-  const { transactions } = useTransactions({ accountId: activeAccountId });
-  const { categories } = useCategories();
+  const {
+    activeAccount,
+    activeAccountId,
+    loading: accountsLoading,
+  } = useAccounts();
+  const { transactions, loading: txLoading } = useTransactions({
+    accountId: activeAccountId,
+  });
+  const { categories, loading: catsLoading } = useCategories();
+  const loading = accountsLoading || txLoading || catsLoading;
 
   const currencyCode = activeAccount?.currency_code || "INR";
   const now = new Date();
@@ -236,7 +248,16 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-        {monthlyExpenses.slices.length === 0 ? (
+        {loading ? (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+            <div className="lg:col-span-5 flex justify-center">
+              <Skeleton className="h-[240px] w-[240px]" rounded="rounded-full" />
+            </div>
+            <div className="lg:col-span-7">
+              <SkeletonBars rows={4} label="Loading monthly breakdown" />
+            </div>
+          </div>
+        ) : monthlyExpenses.slices.length === 0 ? (
           <div className="py-14 text-center space-y-2">
             <p className="font-display text-lg text-[var(--home-text)]">
               No expenses in {monthTitle}
@@ -360,6 +381,9 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Yearly Summary Strip */}
+        {loading ? (
+          <SkeletonStats items={3} />
+        ) : (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="rounded-2xl p-3.5 bg-[var(--home-income-soft)] border border-[var(--home-border)]">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--home-income)] block">
@@ -393,11 +417,17 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
+        )}
+
         <div className="h-[300px] w-full">
-          <YearlyCashflowBarChart
-            months={yearlyBars.months}
-            currencyCode={currencyCode}
-          />
+          {loading ? (
+            <ChartLoader />
+          ) : (
+            <YearlyCashflowBarChart
+              months={yearlyBars.months}
+              currencyCode={currencyCode}
+            />
+          )}
         </div>
       </section>
     </div>

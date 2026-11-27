@@ -18,6 +18,7 @@ import SettingsSubpageHeader from "@/components/settings/SettingsSubpageHeader";
 import AvatarBadge from "@/components/shared/AvatarBadge";
 import CurrencySelect from "@/components/CurrencySelect";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
+import { SkeletonGrid } from "@/components/shared/Skeleton";
 
 export default function AccountsSettingsPage() {
   const {
@@ -29,6 +30,7 @@ export default function AccountsSettingsPage() {
     updateAccount,
     deleteAccount,
     transferFunds,
+    loading: accountsLoading,
   } = useAccounts();
 
   // Create / Edit account modal
@@ -209,6 +211,14 @@ export default function AccountsSettingsPage() {
         </div>
       )}
 
+      {accountsLoading ? (
+        <SkeletonGrid
+          items={2}
+          label="Loading accounts"
+          className="grid grid-cols-1 md:grid-cols-2 gap-4"
+          itemClassName="h-40"
+        />
+      ) : (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {accounts.map((acc) => {
           const isActive = acc.id === activeAccountId;
@@ -306,6 +316,7 @@ export default function AccountsSettingsPage() {
           );
         })}
       </div>
+      )}
 
       {/* Create / Edit Account Modal */}
       {accModalOpen && (

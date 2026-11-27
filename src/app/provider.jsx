@@ -14,7 +14,8 @@ import {
 import { setSyncStatus } from "@/redux/slices/appSlice";
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseconfig";
 import { getProfile } from "@/services/authService";
-import { ensureDefaults, closeOwnerDb } from "@/lib/localDb";
+import { ensureDefaults, closeOwnerDb, getPreference } from "@/lib/localDb";
+import { markDataReady, markDataPending } from "@/lib/dataReady";
 import { syncNow, subscribeSyncStatus } from "@/lib/syncEngine";
 
 const CSS_TOKEN_MAP = {
@@ -101,6 +102,7 @@ function ReduxThemeBridge({ children }) {
         }),
       );
       await ensureDefaults({ ownerId: null, enqueueSync: false }).catch(() => {});
+      if (mounted) markDataReady();
     };
 
     const hydrateAuthenticated = async (session) => {
@@ -113,6 +115,14 @@ function ReduxThemeBridge({ children }) {
         await closeOwnerDb(activeOwnerRef.current);
       }
       activeOwnerRef.current = nextOwnerId;
+
+      // Returning device: local data is already complete, sync in background.
+      // First time on this device: keep skeletons up until the first pull lands.
+      const syncedBefore = await getPreference(nextOwnerId, "sync_meta")
+        .then((m) => Boolean(m?.initial_pull_done))
+        .catch(() => false);
+      if (syncedBefore) markDataReady();
+      else markDataPending();
 
       const profile = await getProfile(nextOwnerId);
       if (!mounted) return;
@@ -130,7 +140,11 @@ function ReduxThemeBridge({ children }) {
           profile?.default_currency ||
           session.user?.user_metadata?.currency ||
           "INR",
-      }).catch(() => {});
+      })
+        .catch(() => {})
+        .finally(() => {
+          if (mounted) markDataReady();
+        });
     };
 
     if (!isSupabaseConfigured || !supabase) {

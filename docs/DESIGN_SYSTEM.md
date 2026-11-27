@@ -110,3 +110,10 @@ console errors on primary routes in both themes. Keep touch targets ≥ 44px on 
 - Use `formatMoney(amount, currencyCode)` for all amounts; never `toFixed` directly.
 - Provide empty, loading (use `AppLoader`) and error states; add `aria-label`s on icon buttons.
 - Respect `prefers-reduced-motion` for new animations.
+
+## Loading states (skeletons)
+
+- Primitives live in `src/components/shared/Skeleton.jsx` (`Skeleton`, `SkeletonList`, `SkeletonBars`, `SkeletonGrid`, `SkeletonHero`, `SkeletonStats`, ...); `PageSkeleton.jsx` is the generic page-level fallback used by `(private)/loading.jsx` and Suspense fallbacks. Shimmer is the `.ss-skeleton` class in `globals.css` (respects `prefers-reduced-motion`).
+- `src/lib/dataReady.js` is a small non-persisted store (`useDataReady`). The provider marks it ready for guests after local defaults are seeded, immediately for returning signed-in devices (`sync_meta.initial_pull_done`), and after the first cloud pull settles on a new device (12 s safety timeout). `AppShell` shows `PageSkeleton` until ready.
+- Data hooks (`useAccounts/useTransactions/useCategories/useBuckets/useBucketDetails`) return `loading = firstLoadForThisOwnerAccount || !dataReady`. Refetches after edits are silent (no skeleton flash). Pages render a skeleton per section while `loading` is true instead of zero/empty states.
+- Dev-only preview: `/loader-preview` shows the skeleton set.

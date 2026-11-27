@@ -4,6 +4,12 @@ import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import Link from "next/link";
 import AppLoader from "@/components/shared/AppLoader";
+import PageSkeleton from "@/components/shared/PageSkeleton";
+import {
+  SkeletonList,
+  SkeletonBars,
+  SkeletonGrid,
+} from "@/components/shared/Skeleton";
 import { changeTheme } from "@/redux/slices/themeSlice";
 
 const DURATION_OPTIONS = [3, 5, 10];
@@ -106,6 +112,28 @@ export default function LoaderPreviewClient() {
             Route / Suspense fallbacks (calculators, settings, transactions, bucket detail).
           </p>
           <AppLoader variant="section" label="Loading settings" />
+        </section>
+
+        <section
+          data-testid="skeleton-preview"
+          className="rounded-3xl border border-[var(--home-border)] bg-[var(--home-background)] p-5 space-y-5"
+        >
+          <div>
+            <h2 className="font-bold">Skeletons</h2>
+            <p className="text-xs text-[var(--home-text-secondary)]">
+              Shown on every section until local / cloud data has arrived.
+            </p>
+          </div>
+          <PageSkeleton label="Loading dashboard" />
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-3xl border border-[var(--home-border)] bg-[var(--home-card)] p-5">
+              <SkeletonBars rows={4} />
+            </div>
+            <div className="rounded-3xl border border-[var(--home-border)] bg-[var(--home-card)] px-5 py-2">
+              <SkeletonList rows={4} />
+            </div>
+          </div>
+          <SkeletonGrid items={4} className="grid grid-cols-1 md:grid-cols-2 gap-4" itemClassName="h-32" />
         </section>
 
         <section className="rounded-3xl border border-[var(--home-border)] bg-[var(--home-card)] p-5">

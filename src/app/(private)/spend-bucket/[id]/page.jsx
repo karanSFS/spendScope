@@ -18,7 +18,12 @@ import BucketFormModal from "@/components/buckets/BucketFormModal";
 import BucketEntryModal from "@/components/buckets/BucketEntryModal";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import EmptyStateCard from "@/components/shared/EmptyStateCard";
-import AppLoader from "@/components/shared/AppLoader";
+import {
+  Skeleton,
+  SkeletonCard,
+  SkeletonHero,
+  SkeletonList,
+} from "@/components/shared/Skeleton";
 
 export default function SingleBucketPage() {
   const params = useParams();
@@ -45,7 +50,15 @@ export default function SingleBucketPage() {
   const [deleting, setDeleting] = useState(false);
 
   if (loading) {
-    return <AppLoader variant="section" label="Loading bucket" />;
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-4 w-40" />
+        <SkeletonHero />
+        <SkeletonCard className="px-4 sm:px-6 py-2">
+          <SkeletonList rows={5} label="Loading bucket entries" />
+        </SkeletonCard>
+      </div>
+    );
   }
 
   if (!bucket) {

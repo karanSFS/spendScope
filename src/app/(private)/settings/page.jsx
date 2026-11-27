@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, Suspense } from "react";
-import AppLoader from "@/components/shared/AppLoader";
+import PageSkeleton from "@/components/shared/PageSkeleton";
+import { Skeleton, SkeletonTitle, SkeletonRegion } from "@/components/shared/Skeleton";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
@@ -110,7 +111,12 @@ function SettingsContent() {
   const searchParams = useSearchParams();
   const dispatch = useDispatch();
   const { userId, isGuest, displayName } = useAuth();
-  const { activeAccount, accounts, updateAccount } = useAccounts();
+  const {
+    activeAccount,
+    accounts,
+    updateAccount,
+    loading: accountsLoading,
+  } = useAccounts();
 
   const themeState = useSelector((state) => state?.themeSlice);
   const appState = useSelector((state) => state?.appSlice);
@@ -189,6 +195,31 @@ function SettingsContent() {
     const m = String(activeAccount.reminder_minute ?? 0).padStart(2, "0");
     return `${activeAccount.reminders} · ${String(h).padStart(2, "0")}:${m}`;
   };
+
+  if (accountsLoading) {
+    return (
+      <SkeletonRegion label="Loading settings" className="space-y-6">
+        <SkeletonTitle />
+        {[3, 4, 3].map((rows, i) => (
+          <div key={i} className="space-y-2">
+            <Skeleton className="h-3 w-24" />
+            <div className="rounded-[24px] border border-[var(--home-border)] bg-[var(--home-card)] divide-y divide-[var(--home-border)] overflow-hidden">
+              {Array.from({ length: rows }).map((_, r) => (
+                <div key={r} className="flex items-center gap-3 px-4 py-4">
+                  <Skeleton className="h-9 w-9 shrink-0" rounded="rounded-full" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-3.5 w-40 max-w-full" />
+                    <Skeleton className="h-3 w-56 max-w-full" />
+                  </div>
+                  <Skeleton className="h-4 w-14" />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </SkeletonRegion>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -455,7 +486,7 @@ function SettingsContent() {
 export default function SettingsPage() {
   return (
     <Suspense
-      fallback={<AppLoader variant="section" label="Loading settings" />}
+      fallback={<PageSkeleton label="Loading settings" />}
     >
       <SettingsContent />
     </Suspense>

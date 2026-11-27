@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSelector } from "react-redux";
 import {
   getCategories as fetchCategoriesApi,
@@ -11,6 +11,7 @@ import {
   deleteCategory as deleteCategoryApi,
 } from "@/services/categoriesService";
 import { subscribeDataChanged } from "@/lib/localDb";
+import { useDataReady } from "@/lib/dataReady";
 
 export const useCategories = () => {
   const userId = useSelector((state) => state?.authSlice?.userId) || null;
@@ -18,9 +19,12 @@ export const useCategories = () => {
   const [linkedCounts, setLinkedCounts] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const dataReady = useDataReady();
+  const loadedKeyRef = useRef(null);
 
   const getCategories = useCallback(async () => {
-    setLoading(true);
+    const key = String(userId);
+    if (loadedKeyRef.current !== key) setLoading(true);
     setError(null);
     try {
       const [data, counts] = await Promise.all([
@@ -33,6 +37,7 @@ export const useCategories = () => {
       const errMsg = err?.message || "Failed to load categories.";
       setError(errMsg);
     } finally {
+      loadedKeyRef.current = key;
       setLoading(false);
     }
   }, [userId]);
@@ -105,7 +110,7 @@ export const useCategories = () => {
   return {
     categories,
     linkedCounts,
-    loading,
+    loading: loading || !dataReady,
     error,
     getCategories,
     createCategory,

@@ -29,29 +29,23 @@ const storage =
     ? createNoopStorage()
     : createWebStorage("local");
 
-
+// Auth session is owned strictly by Supabase Auth (onAuthStateChange),
+// never persisted as stale token cookies or Redux storage.
 const persistConfig = {
   key: "root",
-  version: 1.2,
+  version: 2,
   storage,
+  whitelist: ["themeSlice", "appSlice"],
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);
 
 const store = configureStore({
   reducer: persistedReducer,
-
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
-        ignoredActions: [
-          FLUSH,
-          REHYDRATE,
-          PAUSE,
-          PERSIST,
-          PURGE,
-          REGISTER,
-        ],
+        ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
       },
     }),
 });

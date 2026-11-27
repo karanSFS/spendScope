@@ -1,183 +1,265 @@
-import { supabase } from "@/lib/supabaseconfig";
 import { store } from "@/redux";
+import { supabase, isSupabaseConfigured } from "@/lib/supabaseconfig";
+import {
+  listEntities,
+  upsertEntity,
+  deleteEntity,
+  ensureDefaults,
+} from "@/lib/localDb";
+import { pushOutbox } from "@/lib/syncEngine";
+import { generateUuid } from "@/lib/defaultSeeds";
+import { toLocalMidnightIso, fromIsoToLocalDateKey } from "@/lib/dateUtils";
 
-/**
- * Helper to get current authenticated user ID directly from Redux authSlice
- */
-const getAuthUserId = () => {
+const getContext = () => {
   try {
     const state = store?.getState?.();
-    return (
-      state?.authSlice?.userId ||
-      state?.auth?.userId ||
-      state?.authSlice?.userData?.id ||
-      state?.auth?.userData?.id ||
-      state?.authSlice?.userData?.user?.id ||
-      state?.auth?.userData?.user?.id ||
-      null
-    );
+    const userId = state?.authSlice?.userId || null;
+    const activeAccountId = state?.appSlice?.activeAccountId || null;
+    const defaultCurrency =
+      state?.authSlice?.profile?.default_currency || "INR";
+    return { userId, activeAccountId, defaultCurrency };
   } catch {
-    return null;
+    return { userId: null, activeAccountId: null, defaultCurrency: "INR" };
   }
 };
 
-/**
- * Fetch all transactions dynamically from Supabase database joined with Categories.
- * Uses Redux auth state directly instead of calling supabase.auth.getUser().
- */
+const toViewTransaction = (tx, categoryMap) => {
+  const cat = tx.category_id ? categoryMap.get(tx.category_id) : null;
+  const kind = (tx.kind || cat?.kind || "expense").toLowerCase();
+  return {
+    ...tx,
+    type: kind === "income" ? "Income" : "Expense",
+    amount: Number(tx.amount) || 0,
+    category: tx.transfer_group_id
+      ? "Account Transfer"
+      : cat?.name || "Uncategorized",
+    category_icon: tx.transfer_group_id
+      ? "transfer"
+      : cat?.icon_key || "other",
+    color_code: cat?.color || "#C88856",
+    date:
+      fromIsoToLocalDateKey(tx.occurred_at) ||
+      fromIsoToLocalDateKey(tx.created_at),
+    note: tx.note || "",
+  };
+};
+
 export const getTransactions = async (params = {}) => {
-  try {
-    let explicitUserId = null;
-    let page = null;
-    let limit = null;
-    let startDate = null;
-    let endDate = null;
+  const ctx = getContext();
+  const ownerId =
+    typeof params === "string"
+      ? params
+      : params?.userId !== undefined
+        ? params.userId
+        : params?.explicitUserId !== undefined
+          ? params.explicitUserId
+          : ctx.userId;
 
-    if (typeof params === "string") {
-      explicitUserId = params;
-    } else if (typeof params === "object" && params !== null) {
-      explicitUserId = params.userId || params.explicitUserId;
-      page = params.page;
-      limit = params.limit;
-      startDate = params.startDate;
-      endDate = params.endDate;
-    }
+  await ensureDefaults({
+    ownerId,
+    currencyCode: ctx.defaultCurrency,
+    enqueueSync: Boolean(ownerId),
+  });
 
-    const userId = explicitUserId || getAuthUserId();
+  const [txRows, catRows] = await Promise.all([
+    listEntities(ownerId, "transactions"),
+    listEntities(ownerId, "categories"),
+  ]);
 
-    let query = supabase
-      .from("transactions")
-      .select("*, categories (id, name, type, icon, color_code)", {
-        count: "exact",
+  const categoryMap = new Map(catRows.map((c) => [c.id, c]));
+  const filterAccountId =
+    typeof params === "object" && params !== null
+      ? params.accountId !== undefined
+        ? params.accountId
+        : ctx.activeAccountId
+      : ctx.activeAccountId;
+
+  let items = txRows
+    .filter((t) => !filterAccountId || t.account_id === filterAccountId)
+    .map((t) => toViewTransaction(t, categoryMap));
+
+  if (typeof params === "object" && params !== null) {
+    const { startDate, endDate, limit, page } = params;
+    if (startDate || endDate) {
+      items = items.filter((item) => {
+        if (startDate && item.date < startDate) return false;
+        if (endDate && item.date > endDate) return false;
+        return true;
       });
-
-    if (userId) {
-      query = query.or(`user_id.eq.${userId},user_id.is.null`);
     }
+    items.sort((a, b) => {
+      const dateCmp = String(b.date || "").localeCompare(String(a.date || ""));
+      if (dateCmp !== 0) return dateCmp;
+      return String(b.created_at || "").localeCompare(String(a.created_at || ""));
+    });
 
-    if (startDate && endDate) {
-      query = query.gte("date", startDate).lte("date", endDate);
-    } else if (startDate) {
-      query = query.gte("date", startDate);
-    } else if (endDate) {
-      query = query.lte("date", endDate);
-    }
-
-    query = query
-      .order("date", { ascending: false })
-      .order("created_at", { ascending: false });
-
+    const totalCount = items.length;
     if (limit && page) {
-      const from = (page - 1) * limit;
-      const to = from + limit - 1;
-      query = query.range(from, to);
+      const start = (page - 1) * limit;
+      items = items.slice(start, start + limit);
     } else if (limit) {
-      query = query.limit(limit);
+      items = items.slice(0, limit);
     }
-
-    const { data, count, error } = await query;
-
-    if (error) {
-      console.error("Supabase query error for transactions:", error);
-      throw new Error(error.message || "Failed to fetch transactions.");
-    }
-
-    const items = (data || []).map((t) => ({
-      id: t.id,
-      amount: parseFloat(t.amount) || 0,
-      type: t.type || t.categories?.type || "Expense",
-      category_id: t.category_id,
-      category: t.categories?.name || "Uncategorized",
-      category_icon: "🏷️",
-      color_code: t.categories?.color_code || "#FF6B6B",
-      date: t.date || new Date().toISOString().split("T")[0],
-      note: t.note || "",
-      created_at: t.created_at,
-    }));
-
-    items.totalCount =
-      typeof count === "number" && !isNaN(count) ? count : items.length;
-
+    items.totalCount = totalCount;
     return items;
-  } catch (err) {
-    console.error("Transactions query error:", err);
-    throw err;
   }
+
+  items.sort((a, b) =>
+    String(b.occurred_at || b.created_at || "").localeCompare(
+      String(a.occurred_at || a.created_at || ""),
+    ),
+  );
+  items.totalCount = items.length;
+  return items;
 };
 
-/**
- * Create a new transaction in Supabase database.
- * Uses Redux auth state directly instead of calling supabase.auth.getUser().
- */
 export const createTransaction = async ({
   amount,
   type,
+  kind,
   category_id,
+  account_id,
+  currency_code,
   date,
+  occurred_at,
   note,
   userId: explicitUserId,
 }) => {
-  try {
-    const userId = explicitUserId || getAuthUserId();
+  const ctx = getContext();
+  const ownerId = explicitUserId !== undefined ? explicitUserId : ctx.userId;
 
-    const payload = {
-      amount: parseFloat(amount),
-      type: type || "Expense",
-      category_id: category_id && !isNaN(category_id) ? parseInt(category_id) : null,
-      date: date || new Date().toISOString().split("T")[0],
-      note: note ? note.trim() : null,
-      ...(userId ? { user_id: userId } : {}),
-    };
+  const { accounts } = await ensureDefaults({
+    ownerId,
+    currencyCode: ctx.defaultCurrency,
+    enqueueSync: Boolean(ownerId),
+  });
 
-    const { data, error } = await supabase
-      .from("transactions")
-      .insert([payload])
-      .select("*, categories (id, name, type, icon, color_code)")
-      .single();
+  const resolvedAccountId =
+    account_id || ctx.activeAccountId || accounts[0]?.id;
+  const activeAcc =
+    accounts.find((a) => a.id === resolvedAccountId) || accounts[0];
+  const resolvedKind = String(kind || type || "expense").toLowerCase();
+  const nowIso = new Date().toISOString();
 
-    if (error) {
-      console.error("Supabase error inserting transaction:", error);
-      throw new Error(error.message || "Failed to create transaction.");
-    }
+  const record = {
+    id: generateUuid(),
+    owner_id: ownerId || null,
+    account_id: resolvedAccountId,
+    category_id: category_id || null,
+    kind: resolvedKind === "income" ? "income" : "expense",
+    amount: Math.round((Number(amount) + Number.EPSILON) * 100) / 100,
+    currency_code: (
+      currency_code ||
+      activeAcc?.currency_code ||
+      ctx.defaultCurrency ||
+      "INR"
+    ).toUpperCase(),
+    note: note ? String(note).trim() : null,
+    occurred_at: occurred_at || toLocalMidnightIso(date || new Date()),
+    transfer_group_id: null,
+    counterparty_account_id: null,
+    receipt_url: null,
+    created_at: nowIso,
+    updated_at: nowIso,
+    deleted_at: null,
+  };
 
-    return {
-      id: data.id,
-      amount: parseFloat(data.amount) || 0,
-      type: data.type || "Expense",
-      category_id: data.category_id,
-      category: data.categories?.name || "Uncategorized",
-      category_icon: "🏷️",
-      color_code: data.categories?.color_code || "#FF6B6B",
-      date: data.date,
-      note: data.note || "",
-      created_at: data.created_at,
-    };
-  } catch (err) {
-    console.error("Transaction creation error:", err);
-    throw err;
+  await upsertEntity(ownerId, "transactions", record, {
+    enqueueSync: Boolean(ownerId),
+  });
+
+  if (ownerId && isSupabaseConfigured && supabase) {
+    pushOutbox(ownerId, supabase).catch(() => {});
   }
+
+  const catRows = await listEntities(ownerId, "categories");
+  const catMap = new Map(catRows.map((c) => [c.id, c]));
+  return toViewTransaction(record, catMap);
 };
 
-/**
- * Delete a transaction by ID in Supabase database.
- */
-export const deleteTransaction = async (id) => {
-  try {
-    if (!id) throw new Error("Transaction ID is required.");
+export const updateTransaction = async (id, updates = {}, explicitUserId) => {
+  if (!id) throw new Error("Transaction ID is required.");
+  const ctx = getContext();
+  const ownerId = explicitUserId !== undefined ? explicitUserId : ctx.userId;
 
-    const { error } = await supabase
-      .from("transactions")
-      .delete()
-      .eq("id", id);
+  const [txRows, catRows] = await Promise.all([
+    listEntities(ownerId, "transactions"),
+    listEntities(ownerId, "categories"),
+  ]);
+  const current = txRows.find((t) => t.id === id);
+  if (!current) throw new Error("Transaction not found.");
 
-    if (error) {
-      console.error("Supabase error deleting transaction:", error);
-      throw new Error(error.message || "Failed to delete transaction.");
-    }
+  const resolvedKind =
+    updates.kind !== undefined || updates.type !== undefined
+      ? String(updates.kind || updates.type).toLowerCase() === "income"
+        ? "income"
+        : "expense"
+      : current.kind;
 
-    return true;
-  } catch (err) {
-    console.error("Delete transaction error:", err);
-    throw err;
+  const next = {
+    ...current,
+    ...(updates.account_id !== undefined
+      ? { account_id: updates.account_id }
+      : {}),
+    ...(updates.category_id !== undefined
+      ? { category_id: updates.category_id || null }
+      : {}),
+    kind: resolvedKind,
+    ...(updates.amount !== undefined
+      ? {
+          amount:
+            Math.round((Number(updates.amount) + Number.EPSILON) * 100) / 100,
+        }
+      : {}),
+    ...(updates.date !== undefined || updates.occurred_at !== undefined
+      ? {
+          occurred_at:
+            updates.occurred_at || toLocalMidnightIso(updates.date),
+        }
+      : {}),
+    ...(updates.note !== undefined
+      ? { note: updates.note ? String(updates.note).trim() : null }
+      : {}),
+    updated_at: new Date().toISOString(),
+  };
+
+  await upsertEntity(ownerId, "transactions", next, {
+    enqueueSync: Boolean(ownerId),
+  });
+
+  if (ownerId && isSupabaseConfigured && supabase) {
+    pushOutbox(ownerId, supabase).catch(() => {});
   }
+
+  const catMap = new Map(catRows.map((c) => [c.id, c]));
+  return toViewTransaction(next, catMap);
+};
+
+export const deleteTransaction = async (id, explicitUserId) => {
+  if (!id) throw new Error("Transaction ID is required.");
+  const ctx = getContext();
+  const ownerId = explicitUserId !== undefined ? explicitUserId : ctx.userId;
+
+  const rows = await listEntities(ownerId, "transactions");
+  const target = rows.find((t) => t.id === id);
+
+  if (target?.transfer_group_id) {
+    const paired = rows.filter(
+      (t) => t.transfer_group_id === target.transfer_group_id,
+    );
+    for (const row of paired) {
+      await deleteEntity(ownerId, "transactions", row.id, {
+        enqueueSync: Boolean(ownerId),
+      });
+    }
+  } else {
+    await deleteEntity(ownerId, "transactions", id, {
+      enqueueSync: Boolean(ownerId),
+    });
+  }
+
+  if (ownerId && isSupabaseConfigured && supabase) {
+    pushOutbox(ownerId, supabase).catch(() => {});
+  }
+  return true;
 };

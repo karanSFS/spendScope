@@ -1,20 +1,11 @@
-project_id = "yvijdbtpplgimqfhnzyk"
+# SpendScope Supabase Configuration (New Project)
+# Linked project ref should be verified with `supabase link --project-ref erjlfsclkprqterpsoaa`
+project_id = "erjlfsclkprqterpsoaa"
 
-# Payment webhooks are called by Xendit/PayPal, not by a Supabase user JWT.
-[functions.paypal-webhook]
-verify_jwt = false
+[auth]
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000/**", "http://127.0.0.1:3000/**"]
 
-[functions.xendit-webhook]
-verify_jwt = false
-
-# PayPal return completion is called from the browser, including guests.
-[functions.complete-paypal-checkout]
-verify_jwt = false
-
-# Guests poll Xendit/order status after invoice redirect without a user JWT.
-[functions.order-payment-status]
-verify_jwt = false
-
-# Called by Supabase Cron with the private worker secret.
-[functions.process-order-email-events]
-verify_jwt = false
+[auth.email]
+enable_signup = true
+minimum_password_length = 12

@@ -28,18 +28,11 @@ export const CURRENCIES = [
     locale: "en-GB",
   },
   {
-    code: "AED",
-    symbol: "د.إ",
-    name: "UAE Dirham",
-    flag: "🇦🇪",
-    locale: "ar-AE",
-  },
-  {
-    code: "CAD",
-    symbol: "C$",
-    name: "Canadian Dollar",
-    flag: "🇨🇦",
-    locale: "en-CA",
+    code: "JPY",
+    symbol: "¥",
+    name: "Japanese Yen",
+    flag: "🇯🇵",
+    locale: "ja-JP",
   },
   {
     code: "AUD",
@@ -49,11 +42,39 @@ export const CURRENCIES = [
     locale: "en-AU",
   },
   {
-    code: "JPY",
+    code: "CAD",
+    symbol: "C$",
+    name: "Canadian Dollar",
+    flag: "🇨🇦",
+    locale: "en-CA",
+  },
+  {
+    code: "CNY",
     symbol: "¥",
-    name: "Japanese Yen",
-    flag: "🇯🇵",
-    locale: "ja-JP",
+    name: "Chinese Yuan",
+    flag: "🇨🇳",
+    locale: "zh-CN",
+  },
+  {
+    code: "BRL",
+    symbol: "R$",
+    name: "Brazilian Real",
+    flag: "🇧🇷",
+    locale: "pt-BR",
+  },
+  {
+    code: "RUB",
+    symbol: "₽",
+    name: "Russian Ruble",
+    flag: "🇷🇺",
+    locale: "ru-RU",
+  },
+  {
+    code: "AED",
+    symbol: "د.إ",
+    name: "UAE Dirham",
+    flag: "🇦🇪",
+    locale: "ar-AE",
   },
   {
     code: "SGD",
@@ -67,16 +88,35 @@ export const CURRENCIES = [
 export const DEFAULT_CURRENCY = CURRENCIES[0]; // INR ₹
 
 export const getCurrencySymbol = (currencyCode = "INR") => {
-  const found = CURRENCIES.find(
-    (c) => c.code?.toUpperCase() === String(currencyCode)?.toUpperCase()
-  );
+  const code = String(currencyCode || "INR").toUpperCase();
+  const found = CURRENCIES.find((c) => c.code === code);
   return found ? found.symbol : "₹";
 };
 
 export const getCurrencyConfig = (currencyCode = "INR") => {
-  return (
-    CURRENCIES.find(
-      (c) => c.code?.toUpperCase() === String(currencyCode)?.toUpperCase()
-    ) || DEFAULT_CURRENCY
-  );
+  const code = String(currencyCode || "INR").toUpperCase();
+  return CURRENCIES.find((c) => c.code === code) || DEFAULT_CURRENCY;
+};
+
+/**
+ * Formats an amount using the active account currency without Android's
+ * [0.0, 0.1] * 100 truncation bug.
+ */
+export const formatMoney = (
+  value,
+  currencyCode = "INR",
+  { minimumFractionDigits = 0, maximumFractionDigits = 2, showSign = false } = {},
+) => {
+  const num = Number(value);
+  const safe = Number.isFinite(num) ? num : 0;
+  const config = getCurrencyConfig(currencyCode);
+  const abs = Math.abs(safe);
+  const rounded = Math.round((abs + Number.EPSILON) * 100) / 100;
+  const formattedNumber = new Intl.NumberFormat(config.locale, {
+    minimumFractionDigits,
+    maximumFractionDigits,
+  }).format(rounded);
+
+  const prefix = safe < 0 ? "-" : showSign && safe > 0 ? "+" : "";
+  return `${prefix}${config.symbol}${formattedNumber}`;
 };

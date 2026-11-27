@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useSelector } from "react-redux";
 import { useTheme } from "styled-components";
 import { HiArrowPath, HiOutlineExclamationTriangle, HiXMark } from "react-icons/hi2";
-import { resetUserTransactions } from "@/services/resetSevices";
+import { resetUserTransactions } from "@/services/resetService";
 import { theme as defaultTheme } from "@/utils/theme";
 
 export default function ResetButton({
@@ -24,6 +24,7 @@ export default function ResetButton({
 
   const themeContext = useTheme();
   const themeState = useSelector((state) => state?.themeSlice || state?.theme);
+  const userId = useSelector((state) => state?.authSlice?.userId) || null;
   const currentTheme = themeContext?.colors ? themeContext : themeState;
   const isDark = currentTheme?.mode === "dark" || themeState?.mode === "dark";
 
@@ -37,7 +38,7 @@ export default function ResetButton({
   const handleConfirmReset = async () => {
     setIsResetting(true);
     try {
-      const res = await resetUserTransactions();
+      const res = await resetUserTransactions(userId);
       if (res.success) {
         setShowConfirmModal(false);
         if (onResetComplete) {

@@ -1,48 +1,28 @@
 import { NextResponse } from "next/server";
 
+/**
+ * Guest-first routing middleware.
+ * - Private workspace routes (/dashboard, /transactions, /analytics, /spend-bucket,
+ *   /categories, /calculators, /settings) are open to both Guests and Authenticated users.
+ * - Legacy routes (/landing, /spend-budget, /calculators-m) redirect cleanly while
+ *   preserving query parameters (e.g. ?type=emi-calculator&category=emi).
+ */
 export function middleware(request) {
-  const token = request.cookies.get("token")?.value;
-  const { pathname } = request.nextUrl;
+  const { pathname, search } = request.nextUrl;
 
-  const isLoggedIn = Boolean(token);
-
-  const publicRoutes = ["/sign-in", "/signup", "/landing", "/"];
-  const isPublicRoute = publicRoutes.some(
-    (route) => pathname === route || pathname.startsWith(`${route}/`)
-  );
-
-
-  // 1. Authenticated users
-  if (isLoggedIn) {
-    // Redirect away from public auth pages or root to /dashboard
-    if (isPublicRoute || pathname === "/") {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
-    }
-
-    // Allow all private routes (e.g., /dashboard, /categories)
-    return NextResponse.next();
+  if (pathname === "/landing") {
+    return NextResponse.redirect(new URL(`/${search}`, request.url));
   }
 
-  // 2. Unauthenticated users
-  if (!isLoggedIn) {
-    if (pathname === "/sign-in") {
-      return NextResponse.redirect(new URL("/?modal=signin", request.url));
-    }
+  if (pathname === "/spend-budget") {
+    return NextResponse.redirect(new URL(`/spend-bucket${search}`, request.url));
+  }
 
-    if (pathname === "/signup") {
-      return NextResponse.redirect(new URL("/?modal=signup", request.url));
-    }
-
-    if (pathname === "/landing") {
-      return NextResponse.redirect(new URL("/", request.url));
-    }
-
-    if (pathname === "/") {
-      return NextResponse.next();
-    }
-
-    // Redirect unauthenticated access to home page
-    return NextResponse.redirect(new URL("/", request.url));
+  if (
+    pathname === "/calculators-m" ||
+    pathname === "/calculators-m/calculating"
+  ) {
+    return NextResponse.redirect(new URL(`/calculators${search}`, request.url));
   }
 
   return NextResponse.next();

@@ -7,10 +7,8 @@ import { CURRENCIES, DEFAULT_CURRENCY } from "@/utils/currencies";
 export default function CurrencySelect({
   value = DEFAULT_CURRENCY.code,
   onChange,
-  isDark = false,
-  primaryColor = "#EB5757",
   className = "",
-  roundedClass = "rounded-lg",
+  roundedClass = "rounded-xl",
   id = "currency-select",
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -20,7 +18,7 @@ export default function CurrencySelect({
 
   const selectedCurrency = useMemo(
     () => CURRENCIES.find((c) => c.code === value) || CURRENCIES[0],
-    [value]
+    [value],
   );
 
   const filteredCurrencies = useMemo(() => {
@@ -30,11 +28,10 @@ export default function CurrencySelect({
       (c) =>
         c.name.toLowerCase().includes(q) ||
         c.code.toLowerCase().includes(q) ||
-        c.symbol.toLowerCase().includes(q)
+        c.symbol.toLowerCase().includes(q),
     );
   }, [searchQuery]);
 
-  // Handle outside click
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (containerRef.current && !containerRef.current.contains(e.target)) {
@@ -49,7 +46,6 @@ export default function CurrencySelect({
     };
   }, [isOpen]);
 
-  // Focus search input when opened
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => {
@@ -61,84 +57,55 @@ export default function CurrencySelect({
   }, [isOpen]);
 
   const handleSelect = (code) => {
-    if (onChange) {
-      onChange(code);
-    }
+    if (onChange) onChange(code);
     setIsOpen(false);
   };
 
   return (
     <div className={`relative w-full ${className}`} ref={containerRef}>
-      {/* Trigger Button - Sized identically to input fields */}
       <button
         id={id}
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className={`w-full px-4 py-2.5 ${roundedClass} border text-sm flex items-center justify-between transition-all cursor-pointer text-left focus:outline-none ${
-          isDark
-            ? "bg-[#161522] border-[#232234] text-white focus:border-slate-400"
-            : "bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-slate-300"
-        } ${isOpen ? (isDark ? "border-slate-400" : "ring-2 ring-slate-300 border-gray-400") : ""}`}
-        style={isOpen ? { borderColor: primaryColor } : {}}
+        className={`w-full px-4 py-2.5 ${roundedClass} border border-[var(--home-border)] bg-[var(--home-background)] text-[var(--home-text)] text-sm flex items-center justify-between transition-all cursor-pointer text-left focus:outline-none focus:border-[var(--home-accent)]`}
       >
         <div className="flex items-center gap-2.5 min-w-0">
-          <span className="text-base leading-none shrink-0">{selectedCurrency.flag}</span>
+          <span className="text-base leading-none shrink-0">
+            {selectedCurrency.flag}
+          </span>
           <span className="font-semibold text-sm truncate">
             {selectedCurrency.code} ({selectedCurrency.symbol})
           </span>
-          <span
-            className={`text-xs truncate hidden sm:inline ${
-              isDark ? "text-slate-400" : "text-gray-500"
-            }`}
-          >
+          <span className="text-xs truncate hidden sm:inline text-[var(--home-text-muted)]">
             - {selectedCurrency.name}
           </span>
         </div>
         <HiChevronDown
-          className={`w-4 h-4 shrink-0 transition-transform duration-200 ${
-            isDark ? "text-slate-400" : "text-gray-500"
-          } ${isOpen ? "rotate-180" : ""}`}
+          className={`w-4 h-4 shrink-0 text-[var(--home-text-muted)] transition-transform duration-200 ${
+            isOpen ? "rotate-180" : ""
+          }`}
         />
       </button>
 
-      {/* Dropdown Menu */}
       {isOpen && (
         <div
-          className={`absolute left-0 right-0 mt-1.5 z-50 ${roundedClass} border shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 ${
-            isDark
-              ? "bg-[#161522] border-[#232234] text-white"
-              : "bg-white border-gray-200 text-gray-900"
-          }`}
+          className={`absolute left-0 right-0 mt-1.5 z-50 ${roundedClass} border border-[var(--home-border)] bg-[var(--home-card)] text-[var(--home-text)] shadow-xl overflow-hidden`}
         >
-          {/* Search bar */}
-          <div
-            className={`p-2 border-b flex items-center gap-2 ${
-              isDark ? "border-[#232234] bg-[#111019]" : "border-gray-100 bg-gray-50"
-            }`}
-          >
-            <HiMagnifyingGlass
-              className={`w-4 h-4 shrink-0 ${isDark ? "text-slate-500" : "text-gray-400"}`}
-            />
+          <div className="p-2 border-b border-[var(--home-border)] bg-[var(--home-background)] flex items-center gap-2">
+            <HiMagnifyingGlass className="w-4 h-4 shrink-0 text-[var(--home-text-muted)]" />
             <input
               ref={searchInputRef}
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search currency or country..."
-              className={`w-full bg-transparent text-xs focus:outline-none ${
-                isDark ? "text-white placeholder-slate-500" : "text-gray-800 placeholder-gray-400"
-              }`}
+              className="w-full bg-transparent text-xs text-[var(--home-text)] placeholder-[var(--home-text-muted)] focus:outline-none"
             />
           </div>
 
-          {/* List items */}
           <div className="max-h-56 overflow-y-auto p-1.5 space-y-0.5 custom-scrollbar">
             {filteredCurrencies.length === 0 ? (
-              <div
-                className={`py-4 text-center text-xs ${
-                  isDark ? "text-slate-500" : "text-gray-400"
-                }`}
-              >
+              <div className="py-4 text-center text-xs text-[var(--home-text-muted)]">
                 No currency found
               </div>
             ) : (
@@ -149,30 +116,25 @@ export default function CurrencySelect({
                     key={c.code}
                     type="button"
                     onClick={() => handleSelect(c.code)}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-xs font-medium transition-colors cursor-pointer text-left ${
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer text-left ${
                       isSelected
-                        ? isDark
-                          ? "bg-[#1f1e2f] text-white font-semibold"
-                          : "bg-gray-100 text-gray-900 font-semibold"
-                        : isDark
-                        ? "hover:bg-[#1f1e2f]/70 text-slate-300 hover:text-white"
-                        : "hover:bg-gray-50 text-gray-700 hover:text-gray-900"
+                        ? "bg-[var(--home-track)] text-[var(--home-text)] font-semibold"
+                        : "text-[var(--home-text-secondary)] hover:bg-[var(--home-background)] hover:text-[var(--home-text)]"
                     }`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-base leading-none shrink-0">{c.flag}</span>
+                      <span className="text-base leading-none shrink-0">
+                        {c.flag}
+                      </span>
                       <span className="truncate">{c.name}</span>
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0 ml-2">
-                      <span
-                        className="text-[10px] font-bold px-2 py-0.5 rounded-md text-white"
-                        style={{ backgroundColor: primaryColor }}
-                      >
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--home-accent)] text-[var(--home-on-accent)]">
                         {c.code} ({c.symbol})
                       </span>
                       {isSelected && (
-                        <HiCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                        <HiCheck className="w-3.5 h-3.5 text-[var(--home-income)] shrink-0" />
                       )}
                     </div>
                   </button>

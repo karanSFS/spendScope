@@ -1,117 +1,64 @@
 "use client";
 
 import React from "react";
-import { useTheme } from "styled-components";
-import { useSelector } from "react-redux";
-import {
-  IoRestaurant,
-  IoCar,
-  IoCart,
-  IoFlash,
-  IoHeart,
-  IoFilm,
-  IoBook,
-  IoEllipsisHorizontal,
-} from "react-icons/io5";
+import Link from "next/link";
+import CategoryIcon from "@/components/shared/CategoryIcon";
 
 const categories = [
-  { name: "Food & Dining", Icon: IoRestaurant },
-  { name: "Transport", Icon: IoCar },
-  { name: "Shopping", Icon: IoCart },
-  { name: "Bills & Utilities", Icon: IoFlash },
-  { name: "Health & Fitness", Icon: IoHeart },
-  { name: "Entertainment", Icon: IoFilm },
-  { name: "Education", Icon: IoBook },
-  { name: "Others", Icon: IoEllipsisHorizontal },
+  { name: "Housing", iconKey: "housing", color: "#327da0" },
+  { name: "Utilities", iconKey: "utilities", color: "#0f4d92" },
+  { name: "Dining Out", iconKey: "dining", color: "#fd5800" },
+  { name: "Groceries", iconKey: "groceries", color: "#39a78e" },
+  { name: "Health", iconKey: "health_wellness", color: "#bdda57" },
+  { name: "Entertainment", iconKey: "entertainment", color: "#e5841b" },
+  { name: "Education", iconKey: "education", color: "#b43332" },
+  { name: "Other", iconKey: "other", color: "#af002a" },
 ];
 
-import { theme as defaultTheme } from "@/utils/theme";
-
 export default function CategoriesSection() {
-  const themeContext = useTheme();
-  const reduxTheme = useSelector((state) => state?.themeSlice || state?.theme);
-  const currentTheme = themeContext?.colors ? themeContext : reduxTheme;
-  const primary = currentTheme?.colors?.primary || defaultTheme.colors.primary;
-  const isDark = currentTheme?.mode === "dark";
-
   return (
     <section
-      className={`py-6 md:py-10 transition-colors duration-200 ${
-        isDark ? "bg-[#0b0f19]" : "bg-white"
-      }`}
+      id="categories"
+      className="scroll-mt-20 py-10 md:py-14 bg-[var(--home-background)]"
     >
-      <div className="w-full px-4 sm:px-[80px]">
-        <div
-          className="rounded-[24px] sm:rounded-[32px] p-6 sm:p-8 md:p-10 border transition-colors duration-200"
-          style={{
-            backgroundColor: isDark ? "#1e293b" : "#FFF8F5",
-            borderColor: isDark ? "#334155" : "#FFE8E0",
-          }}
-        >
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-10 items-center">
-            {/* Left Column: Heading & CTA */}
+      <div className="w-full max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="rounded-[28px] p-6 sm:p-10 border border-[var(--home-border)] bg-[var(--home-card)]">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
             <div>
-              <span
-                className="text-[11px] sm:text-xs font-bold tracking-[0.15em] uppercase block mb-3"
-                style={{ color: primary }}
-              >
+              <span className="text-xs font-bold tracking-[0.14em] uppercase block mb-2 text-[var(--home-accent)]">
                 SPENDING CATEGORIES
               </span>
-              <h2
-                className={`text-3xl sm:text-4xl font-extrabold tracking-tight leading-snug mb-4 ${
-                  isDark ? "text-white" : "text-[#1a1a2e]"
-                }`}
-              >
+              <h2 className="font-display text-3xl sm:text-4xl tracking-tight leading-snug mb-4 text-[var(--home-text)]">
                 Organize Your Expenses
                 <br />
                 by Category
               </h2>
-              <p
-                className={`text-sm sm:text-base leading-relaxed mb-7 max-w-md ${
-                  isDark ? "text-gray-400" : "text-gray-500"
-                }`}
-              >
-                See where your money goes with easy-to-understand categories and
-                beautiful charts.
+              <p className="text-sm sm:text-base leading-relaxed mb-6 max-w-md text-[var(--home-text-secondary)]">
+                Pre-seeded with the exact 15 expense and 6 income categories from SpendScope Android, complete with 96 crisp vector icons and custom color palettes.
               </p>
-              <a
-                href="#features"
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-full border-2 text-sm font-semibold transition-all duration-200 hover:shadow-md group"
-                style={{ borderColor: primary, color: primary }}
+              <Link
+                href="/categories"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-[var(--home-border)] bg-[var(--home-background)] text-[var(--home-text)] text-sm font-semibold hover:border-[var(--home-accent)] transition-colors"
               >
-                <span>Explore Categories</span>
-                <span className="group-hover:translate-x-0.5 transition-transform">
-                  →
-                </span>
-              </a>
+                <span>Open Categories Manager</span>
+                <span>→</span>
+              </Link>
             </div>
 
-            {/* Right Column: Categories Grid */}
-            <div className="grid grid-cols-2 xs:grid-cols-4 gap-3 sm:gap-x-5 sm:gap-y-6">
-              {categories.map((cat, i) => (
+            <div className="grid grid-cols-2 xs:grid-cols-4 gap-4">
+              {categories.map((cat) => (
                 <div
-                  key={i}
-                  className="flex flex-col items-center gap-2 group cursor-pointer"
+                  key={cat.name}
+                  className="flex flex-col items-center gap-2 p-3 rounded-2xl border border-[var(--home-border)] bg-[var(--home-background)]"
                 >
-                  <div
-                    className="w-12 h-12 xs:w-14 xs:h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg border shrink-0"
-                    style={{
-                      backgroundColor: isDark
-                        ? `${primary}20`
-                        : `${primary}10`,
-                      color: primary,
-                      borderColor: isDark
-                        ? `${primary}30`
-                        : `${primary}15`,
-                    }}
-                  >
-                    <cat.Icon className="w-5 h-5 xs:w-6 xs:h-6 sm:w-7 sm:h-7" />
-                  </div>
-                  <span
-                    className={`text-[11px] sm:text-xs font-medium text-center leading-tight ${
-                      isDark ? "text-gray-300" : "text-gray-600"
-                    }`}
-                  >
+                  <CategoryIcon
+                    iconKey={cat.iconKey}
+                    color={cat.color}
+                    size={22}
+                    withBadge
+                    badgeSize={48}
+                  />
+                  <span className="text-xs font-semibold text-center text-[var(--home-text)]">
                     {cat.name}
                   </span>
                 </div>

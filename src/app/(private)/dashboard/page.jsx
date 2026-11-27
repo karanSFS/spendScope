@@ -182,7 +182,7 @@ export default function DashboardPage() {
         <div className="flex items-center gap-3 min-w-0">
           {headerLoading ? (
             <>
-              <Skeleton className="h-[50px] w-[50px] shrink-0" rounded="rounded-full" />
+              <Skeleton className="h-[52px] w-[52px] shrink-0" rounded="rounded-full" />
               <SkeletonTitle />
             </>
           ) : (
@@ -190,18 +190,19 @@ export default function DashboardPage() {
           <button
             type="button"
             onClick={() => setAccountModalOpen(true)}
-            className="rounded-full p-0.5 border border-[var(--home-border)] hover:border-[var(--home-accent)] transition-colors cursor-pointer shrink-0"
+            className="flex shrink-0 rounded-full shadow-sm ring-2 ring-[var(--home-card)] outline outline-1 outline-[var(--home-border-strong)] hover:outline-[var(--home-accent)] transition-colors cursor-pointer"
             title="Switch or add account"
           >
             <AvatarBadge
               avatarKey={activeAccount?.avatar_key || "user_pf"}
               name={activeAccount?.name || "Default"}
-              size={46}
+              size={52}
+              className="!border-0 !bg-transparent"
             />
           </button>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-[var(--home-text)] truncate">
+              <h1 className="font-display text-2xl sm:text-3xl leading-tight tracking-tight text-[var(--home-text)] truncate">
                 {activeAccount?.name || "Default"}
               </h1>
               <button

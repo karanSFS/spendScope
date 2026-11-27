@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -19,6 +19,33 @@ import useAuth from "@/hooks/useAuth";
 import CurrencySelect from "@/components/CurrencySelect";
 import { SpendScopeLogo } from "@/components/Header";
 import { DEFAULT_CURRENCY } from "@/utils/currencies";
+import AuthSplitShell from "@/components/shared/AuthSplitShell";
+
+function evaluatePasswordStrength(pw) {
+  const len = pw.length;
+  if (len === 0) return { score: 0, label: "", color: "var(--home-border)" };
+  let score = 1;
+  if (len >= MIN_PASSWORD_LENGTH) score = 2;
+  const hasMixed = /[a-z]/.test(pw) && /[A-Z]/.test(pw);
+  const hasDigitOrSymbol = /[0-9]/.test(pw) || /[^A-Za-z0-9]/.test(pw);
+  if (len >= MIN_PASSWORD_LENGTH && (hasMixed || hasDigitOrSymbol)) score = 3;
+  if (len >= 14 && hasMixed && hasDigitOrSymbol) score = 4;
+
+  if (len < MIN_PASSWORD_LENGTH) {
+    return {
+      score: 1,
+      label: `${MIN_PASSWORD_LENGTH - len} more char${MIN_PASSWORD_LENGTH - len === 1 ? "" : "s"} needed`,
+      color: "var(--home-destructive)",
+    };
+  }
+  if (score === 2) {
+    return { score: 2, label: "Meets 12-char minimum", color: "var(--home-accent)" };
+  }
+  if (score === 3) {
+    return { score: 3, label: "Good password", color: "var(--home-income)" };
+  }
+  return { score: 4, label: "Strong password", color: "var(--home-income)" };
+}
 
 export default function SignUpPage({
   isModal = false,
@@ -39,6 +66,11 @@ export default function SignUpPage({
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState("");
   const [infoMessage, setInfoMessage] = useState("");
+
+  const pwStrength = useMemo(
+    () => evaluatePasswordStrength(password),
+    [password],
+  );
 
   useEffect(() => {
     if (!isModal && authReady && isAuthenticated) {
@@ -108,7 +140,9 @@ export default function SignUpPage({
   };
 
   const cardContent = (
-    <div className="w-full max-w-md rounded-[24px] border border-[var(--home-border)] bg-[var(--home-card)] text-[var(--home-text)] shadow-2xl p-6 sm:p-8 relative">
+    <div className="w-full max-w-md rounded-[26px] border border-[var(--home-border)] bg-[var(--home-card)] text-[var(--home-text)] shadow-xl p-6 sm:p-8 relative overflow-hidden">
+      <div className="absolute top-0 left-0 right-0 h-1 bg-[var(--home-accent)]/80" />
+
       {isModal && onClose && (
         <button
           type="button"
@@ -124,7 +158,7 @@ export default function SignUpPage({
         <div className="flex justify-center">
           <SpendScopeLogo className="w-9 h-9" />
         </div>
-        <h1 className="font-display text-2xl tracking-tight text-[var(--home-text)]">
+        <h1 className="font-display text-2xl sm:text-[26px] tracking-tight text-[var(--home-text)]">
           Create Cloud Account
         </h1>
         <p className="text-sm text-[var(--home-text-secondary)]">
@@ -159,7 +193,8 @@ export default function SignUpPage({
             htmlFor="signup-displayname"
             className="block text-xs font-semibold uppercase tracking-wider text-[var(--home-text-secondary)] mb-1"
           >
-            Display Name <span className="text-[var(--home-destructive)]">*</span>
+            Display Name{" "}
+            <span className="text-[var(--home-destructive)]">*</span>
           </label>
           <input
             id="signup-displayname"
@@ -172,7 +207,7 @@ export default function SignUpPage({
             required
             autoComplete="name"
             placeholder="Alex Morgan"
-            className="w-full px-4 py-2.5 rounded-xl border border-[var(--home-border)] bg-[var(--home-background)] text-[var(--home-text)] text-sm placeholder-[var(--home-text-muted)] focus:outline-none focus:border-[var(--home-accent)]"
+            className="w-full px-4 py-2.5 rounded-xl border border-[var(--home-border)] bg-[var(--home-background)] text-[var(--home-text)] text-sm placeholder-[var(--home-text-muted)] focus:outline-none focus:border-[var(--home-accent)] focus:ring-2 focus:ring-[var(--home-accent)]/20 transition-all"
           />
         </div>
 
@@ -181,7 +216,8 @@ export default function SignUpPage({
             htmlFor="signup-email"
             className="block text-xs font-semibold uppercase tracking-wider text-[var(--home-text-secondary)] mb-1"
           >
-            Email Address <span className="text-[var(--home-destructive)]">*</span>
+            Email Address{" "}
+            <span className="text-[var(--home-destructive)]">*</span>
           </label>
           <input
             id="signup-email"
@@ -194,44 +230,46 @@ export default function SignUpPage({
             required
             autoComplete="email"
             placeholder="you@example.com"
-            className="w-full px-4 py-2.5 rounded-xl border border-[var(--home-border)] bg-[var(--home-background)] text-[var(--home-text)] text-sm placeholder-[var(--home-text-muted)] focus:outline-none focus:border-[var(--home-accent)]"
+            className="w-full px-4 py-2.5 rounded-xl border border-[var(--home-border)] bg-[var(--home-background)] text-[var(--home-text)] text-sm placeholder-[var(--home-text-muted)] focus:outline-none focus:border-[var(--home-accent)] focus:ring-2 focus:ring-[var(--home-accent)]/20 transition-all"
           />
         </div>
 
-        <div>
-          <label
-            htmlFor="signup-phone"
-            className="block text-xs font-semibold uppercase tracking-wider text-[var(--home-text-secondary)] mb-1"
-          >
-            Phone{" "}
-            <span className="text-[11px] font-normal text-[var(--home-text-muted)]">
-              (Optional)
-            </span>
-          </label>
-          <input
-            id="signup-phone"
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            autoComplete="tel"
-            placeholder="+91 98765 43210"
-            className="w-full px-4 py-2.5 rounded-xl border border-[var(--home-border)] bg-[var(--home-background)] text-[var(--home-text)] text-sm placeholder-[var(--home-text-muted)] focus:outline-none focus:border-[var(--home-accent)]"
-          />
-        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label
+              htmlFor="signup-phone"
+              className="block text-xs font-semibold uppercase tracking-wider text-[var(--home-text-secondary)] mb-1"
+            >
+              Phone{" "}
+              <span className="text-[11px] font-normal text-[var(--home-text-muted)]">
+                (Optional)
+              </span>
+            </label>
+            <input
+              id="signup-phone"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              autoComplete="tel"
+              placeholder="+91 98765 43210"
+              className="w-full px-4 py-2.5 rounded-xl border border-[var(--home-border)] bg-[var(--home-background)] text-[var(--home-text)] text-sm placeholder-[var(--home-text-muted)] focus:outline-none focus:border-[var(--home-accent)] focus:ring-2 focus:ring-[var(--home-accent)]/20 transition-all"
+            />
+          </div>
 
-        <div>
-          <label
-            htmlFor="signup-currency"
-            className="block text-xs font-semibold uppercase tracking-wider text-[var(--home-text-secondary)] mb-1"
-          >
-            Default Currency
-          </label>
-          <CurrencySelect
-            id="signup-currency"
-            value={currency}
-            onChange={(val) => setCurrency(val)}
-            roundedClass="rounded-xl"
-          />
+          <div>
+            <label
+              htmlFor="signup-currency"
+              className="block text-xs font-semibold uppercase tracking-wider text-[var(--home-text-secondary)] mb-1"
+            >
+              Default Currency
+            </label>
+            <CurrencySelect
+              id="signup-currency"
+              value={currency}
+              onChange={(val) => setCurrency(val)}
+              roundedClass="rounded-xl"
+            />
+          </div>
         </div>
 
         <div>
@@ -257,7 +295,7 @@ export default function SignUpPage({
               minLength={MIN_PASSWORD_LENGTH}
               autoComplete="new-password"
               placeholder="At least 12 characters"
-              className="w-full px-4 py-2.5 pr-10 rounded-xl border border-[var(--home-border)] bg-[var(--home-background)] text-[var(--home-text)] text-sm placeholder-[var(--home-text-muted)] focus:outline-none focus:border-[var(--home-accent)]"
+              className="w-full px-4 py-2.5 pr-10 rounded-xl border border-[var(--home-border)] bg-[var(--home-background)] text-[var(--home-text)] text-sm placeholder-[var(--home-text-muted)] focus:outline-none focus:border-[var(--home-accent)] focus:ring-2 focus:ring-[var(--home-accent)]/20 transition-all"
             />
             <button
               type="button"
@@ -272,6 +310,37 @@ export default function SignUpPage({
               )}
             </button>
           </div>
+
+          {/* Live 12-Character Password Strength Meter */}
+          {password.length > 0 && (
+            <div className="mt-2 space-y-1">
+              <div className="grid grid-cols-4 gap-1.5">
+                {[1, 2, 3, 4].map((step) => (
+                  <div
+                    key={step}
+                    className="h-1.5 rounded-full transition-colors duration-200"
+                    style={{
+                      backgroundColor:
+                        pwStrength.score >= step
+                          ? pwStrength.color
+                          : "var(--home-track)",
+                    }}
+                  />
+                ))}
+              </div>
+              <div className="flex items-center justify-between text-[11px]">
+                <span
+                  className="font-semibold"
+                  style={{ color: pwStrength.color }}
+                >
+                  {pwStrength.label}
+                </span>
+                <span className="font-mono-num text-[var(--home-text-muted)]">
+                  {password.length}/{MIN_PASSWORD_LENGTH}+ chars
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         <div>
@@ -294,14 +363,16 @@ export default function SignUpPage({
               minLength={MIN_PASSWORD_LENGTH}
               autoComplete="new-password"
               placeholder="Repeat password"
-              className="w-full px-4 py-2.5 pr-10 rounded-xl border border-[var(--home-border)] bg-[var(--home-background)] text-[var(--home-text)] text-sm placeholder-[var(--home-text-muted)] focus:outline-none focus:border-[var(--home-accent)]"
+              className="w-full px-4 py-2.5 pr-10 rounded-xl border border-[var(--home-border)] bg-[var(--home-background)] text-[var(--home-text)] text-sm placeholder-[var(--home-text-muted)] focus:outline-none focus:border-[var(--home-accent)] focus:ring-2 focus:ring-[var(--home-accent)]/20 transition-all"
             />
             <button
               type="button"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--home-text-muted)] hover:text-[var(--home-text)] cursor-pointer p-1"
               aria-label={
-                showConfirmPassword ? "Hide confirm password" : "Show confirm password"
+                showConfirmPassword
+                  ? "Hide confirm password"
+                  : "Show confirm password"
               }
             >
               {showConfirmPassword ? (
@@ -367,7 +438,10 @@ export default function SignUpPage({
         className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto"
         onClick={onClose}
       >
-        <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md my-auto">
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="w-full max-w-md my-auto"
+        >
           {cardContent}
         </div>
       </div>,
@@ -376,14 +450,12 @@ export default function SignUpPage({
   }
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 bg-[var(--home-background)]">
+    <AuthSplitShell
+      eyebrow="PRIVATE CLOUD BACKUP"
+      headline="Create your encrypted SpendScope account."
+      subtitle="Keep your Guest Mode ledger synced privately across browsers and Android — with zero ads and full CSV/PDF export."
+    >
       {cardContent}
-      <Link
-        href="/"
-        className="mt-5 text-xs font-semibold text-[var(--home-text-secondary)] hover:text-[var(--home-text)]"
-      >
-        ← Back to Home
-      </Link>
-    </div>
+    </AuthSplitShell>
   );
 }

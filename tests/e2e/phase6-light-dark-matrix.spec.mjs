@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
 
+const PUBLIC_ROUTES = ["/", "/sign-in", "/signup", "/privacy-policy"];
+
 const PRIVATE_ROUTES = [
   "/dashboard",
   "/transactions",
@@ -34,6 +36,7 @@ test.describe("Phase 6 Light/Dark & Responsive Layout Matrix", () => {
   test("Primary routes render without overflow, page errors, or console errors in both Light and Dark themes", async ({
     page,
   }) => {
+    test.setTimeout(60000);
     const pageErrors = [];
     const consoleErrors = [];
     const failedResponses = [];
@@ -50,9 +53,16 @@ test.describe("Phase 6 Light/Dark & Responsive Layout Matrix", () => {
       }
     });
 
-    // 1. Landing page Light check + enter Guest Mode
+    // 1. Public pages Light check + interactive widgets + enter Guest Mode
+    for (const pubRoute of PUBLIC_ROUTES) {
+      await page.goto(pubRoute);
+      await page.waitForLoadState("networkidle");
+      await assertNoHorizontalOverflow(page, `${pubRoute} (light)`);
+    }
+
     await page.goto("/");
-    await assertNoHorizontalOverflow(page, "/ (light)");
+    await page.getByRole("tab", { name: /Income \(6\)/i }).click();
+    await expect(page.getByText("Freelance")).toBeVisible();
     await page
       .getByRole("button", { name: /Continue as Guest/i })
       .first()
@@ -100,8 +110,8 @@ test.describe("Phase 6 Light/Dark & Responsive Layout Matrix", () => {
       )
       .toEqual({ hasDark: true, bg: "#1A1714" });
 
-    // 5. Dark mode route sweep (verifying persistence + zero overflow)
-    for (const route of PRIVATE_ROUTES) {
+    // 5. Dark mode route sweep (public + private, verifying persistence + zero overflow)
+    for (const route of [...PUBLIC_ROUTES, ...PRIVATE_ROUTES]) {
       await page.goto(route);
       await page.waitForLoadState("networkidle");
       const isStillDark = await page.evaluate(() =>

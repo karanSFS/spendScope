@@ -13,6 +13,7 @@ import {
 import { getAuthErrorMessage } from "@/services/authService";
 import useAuth from "@/hooks/useAuth";
 import { SpendScopeLogo } from "@/components/Header";
+import AuthSplitShell from "@/components/shared/AuthSplitShell";
 
 export default function SignInPage({
   isModal = false,
@@ -90,7 +91,9 @@ export default function SignInPage({
   };
 
   const cardContent = (
-    <div className="w-full max-w-md rounded-[24px] border border-[var(--home-border)] bg-[var(--home-card)] text-[var(--home-text)] shadow-2xl p-7 sm:p-8 relative">
+    <div className="w-full max-w-md rounded-[26px] border border-[var(--home-border)] bg-[var(--home-card)] text-[var(--home-text)] shadow-xl p-7 sm:p-8 relative overflow-hidden">
+      <div className="absolute top-0 left-0 right-0 h-1 bg-[var(--home-accent)]/80" />
+
       {isModal && onClose && (
         <button
           type="button"
@@ -106,7 +109,7 @@ export default function SignInPage({
         <div className="flex justify-center">
           <SpendScopeLogo className="w-9 h-9" />
         </div>
-        <h1 className="font-display text-2xl tracking-tight text-[var(--home-text)]">
+        <h1 className="font-display text-2xl sm:text-[26px] tracking-tight text-[var(--home-text)]">
           Sign in to SpendScope
         </h1>
         <p className="text-sm text-[var(--home-text-secondary)]">
@@ -144,7 +147,7 @@ export default function SignInPage({
             required
             autoComplete="email"
             placeholder="you@example.com"
-            className="w-full px-4 py-2.5 rounded-xl border border-[var(--home-border)] bg-[var(--home-background)] text-[var(--home-text)] text-sm placeholder-[var(--home-text-muted)] focus:outline-none focus:border-[var(--home-accent)]"
+            className="w-full px-4 py-2.5 rounded-xl border border-[var(--home-border)] bg-[var(--home-background)] text-[var(--home-text)] text-sm placeholder-[var(--home-text-muted)] focus:outline-none focus:border-[var(--home-accent)] focus:ring-2 focus:ring-[var(--home-accent)]/20 transition-all"
           />
         </div>
 
@@ -167,7 +170,7 @@ export default function SignInPage({
               required
               autoComplete="current-password"
               placeholder="••••••••••••"
-              className="w-full px-4 py-2.5 pr-10 rounded-xl border border-[var(--home-border)] bg-[var(--home-background)] text-[var(--home-text)] text-sm placeholder-[var(--home-text-muted)] focus:outline-none focus:border-[var(--home-accent)]"
+              className="w-full px-4 py-2.5 pr-10 rounded-xl border border-[var(--home-border)] bg-[var(--home-background)] text-[var(--home-text)] text-sm placeholder-[var(--home-text-muted)] focus:outline-none focus:border-[var(--home-accent)] focus:ring-2 focus:ring-[var(--home-accent)]/20 transition-all"
             />
             <button
               type="button"
@@ -203,7 +206,7 @@ export default function SignInPage({
         </button>
       </form>
 
-      <div className="mt-4 pt-4 border-t border-[var(--home-border)] space-y-3 text-center">
+      <div className="mt-5 pt-4 border-t border-[var(--home-border)] space-y-3 text-center">
         <button
           type="button"
           onClick={() => {
@@ -257,14 +260,12 @@ export default function SignInPage({
   }
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 bg-[var(--home-background)]">
+    <AuthSplitShell
+      eyebrow="WELCOME BACK"
+      headline="Pick up right where you left off."
+      subtitle="Sign in to sync your accounts, Spend Buckets, and categories across Web and Android — or jump straight into Guest Mode."
+    >
       {cardContent}
-      <Link
-        href="/"
-        className="mt-5 text-xs font-semibold text-[var(--home-text-secondary)] hover:text-[var(--home-text)]"
-      >
-        ← Back to Home
-      </Link>
-    </div>
+    </AuthSplitShell>
   );
 }

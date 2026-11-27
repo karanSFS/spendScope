@@ -86,16 +86,16 @@ export default function AnalyticsPage() {
     }
 
     const grouped = new Map();
-    let total = 0;
+    let totalMinor = 0;
 
     for (const tx of transactions) {
       if (tx.transfer_group_id) continue;
       if (tx.kind !== "expense") continue;
       if (!String(tx.date || "").startsWith(monthPrefix)) continue;
 
-      const amt = Number(tx.amount) || 0;
-      if (amt <= 0) continue;
-      total += amt;
+      const amtMinor = Math.round((Number(tx.amount) || 0) * 100);
+      if (amtMinor <= 0) continue;
+      totalMinor += amtMinor;
 
       const catObj =
         (tx.category_id && catById.get(tx.category_id)) ||
@@ -105,30 +105,33 @@ export default function AnalyticsPage() {
       const cur = grouped.get(key) || {
         key,
         name: catObj?.name || tx.category || "Other",
-        iconKey: catObj?.image_key || tx.category_icon || "other",
-        color: catObj?.color_code || tx.color_code || "#78909C",
-        value: 0,
+        iconKey: catObj?.icon_key || catObj?.icon || tx.category_icon || "other",
+        color: catObj?.color_code || catObj?.color || tx.color_code || "#78909C",
+        valueMinor: 0,
       };
-      cur.value = Math.round((cur.value + amt) * 100) / 100;
+      cur.valueMinor += amtMinor;
       grouped.set(key, cur);
     }
 
     const slices = Array.from(grouped.values())
-      .sort((a, b) => b.value - a.value)
+      .sort((a, b) => b.valueMinor - a.valueMinor)
       .map((item, idx) => ({
         ...item,
+        value: item.valueMinor / 100,
         chartColor: HOME_CATEGORY_PALETTE[idx % HOME_CATEGORY_PALETTE.length],
         percentage:
-          total > 0 ? Math.round((item.value / total) * 1000) / 10 : 0,
+          totalMinor > 0 ? Math.round((item.valueMinor / totalMinor) * 1000) / 10 : 0,
       }));
 
-    return { slices, total: Math.round(total * 100) / 100 };
+    return { slices, total: totalMinor / 100 };
   }, [transactions, categories, monthPrefix]);
 
   const yearlyBars = useMemo(() => {
     const months = MONTH_LABELS.map((label, idx) => ({
       month: label,
       monthIdx: idx,
+      incomeMinor: 0,
+      expenseMinor: 0,
       income: 0,
       expense: 0,
     }));
@@ -139,18 +142,28 @@ export default function AnalyticsPage() {
       if (!String(tx.date || "").startsWith(yearPrefix)) continue;
       const m = Number(String(tx.date).slice(5, 7)) - 1;
       if (m < 0 || m > 11) continue;
-      const amt = Number(tx.amount) || 0;
+      const amtMinor = Math.round((Number(tx.amount) || 0) * 100);
       if (tx.kind === "income") {
-        months[m].income = Math.round((months[m].income + amt) * 100) / 100;
+        months[m].incomeMinor += amtMinor;
       } else {
-        months[m].expense = Math.round((months[m].expense + amt) * 100) / 100;
+        months[m].expenseMinor += amtMinor;
       }
     }
 
-    const totalIncome = months.reduce((s, r) => s + r.income, 0);
-    const totalExpense = months.reduce((s, r) => s + r.expense, 0);
+    let totalIncomeMinor = 0;
+    let totalExpenseMinor = 0;
+    for (const row of months) {
+      row.income = row.incomeMinor / 100;
+      row.expense = row.expenseMinor / 100;
+      totalIncomeMinor += row.incomeMinor;
+      totalExpenseMinor += row.expenseMinor;
+    }
 
-    return { months, totalIncome, totalExpense };
+    return {
+      months,
+      totalIncome: totalIncomeMinor / 100,
+      totalExpense: totalExpenseMinor / 100,
+    };
   }, [transactions, selectedYear]);
 
   const focusedSlice =

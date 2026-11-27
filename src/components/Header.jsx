@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, Suspense } from "react";
 import Link from "next/link";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { HiBars3, HiXMark, HiOutlineSun, HiOutlineMoon } from "react-icons/hi2";
 import { IoColorPaletteOutline } from "react-icons/io5";
 import { useDispatch, useSelector } from "react-redux";
@@ -71,17 +71,19 @@ export function SpendScopeLogo({ className = "w-8 h-8", color }) {
 
 export default function Header() {
   const router = useRouter();
+  const pathname = usePathname();
   const dispatch = useDispatch();
   const { isAuthenticated, continueAsGuest } = useAuth();
   const themeState = useSelector((state) => state?.themeSlice);
   const isDark = themeState?.mode === "dark";
+  const isLanding = pathname === "/" || pathname === "/landing";
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [themeModalOpen, setThemeModalOpen] = useState(false);
   const [showSignInModal, setShowSignInModal] = useState(false);
   const [showSignUpModal, setShowSignUpModal] = useState(false);
   const [isFixed, setIsFixed] = useState(false);
-  const [activeSection, setActiveSection] = useState("home");
+  const [activeSection, setActiveSection] = useState(isLanding ? "home" : null);
 
   const handleOpenAuthModal = useCallback((modalType) => {
     if (modalType === "signin") {
@@ -173,6 +175,11 @@ export default function Header() {
       const scrollY = window.scrollY;
       setIsFixed(scrollY > 12);
 
+      if (!isLanding) {
+        setActiveSection(null);
+        return;
+      }
+
       const atBottom =
         window.innerHeight + scrollY >=
         document.documentElement.scrollHeight - 24;
@@ -206,7 +213,7 @@ export default function Header() {
       window.removeEventListener("resize", handleScrollAndSpy);
       window.removeEventListener("hashchange", handleScrollAndSpy);
     };
-  }, []);
+  }, [isLanding]);
 
   return (
     <>

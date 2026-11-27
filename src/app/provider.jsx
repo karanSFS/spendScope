@@ -3,8 +3,6 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import { Provider, useDispatch, useSelector } from "react-redux";
 import { PersistGate } from "redux-persist/integration/react";
-import { ThemeProvider } from "styled-components";
-import StyledComponentsRegistry from "@/lib/registry";
 import { store, persistor } from "../redux";
 import { buildTheme } from "@/utils/theme";
 import {
@@ -203,24 +201,22 @@ function ReduxThemeBridge({ children }) {
     };
   }, [userId]);
 
-  return <ThemeProvider theme={currentTheme}>{children}</ThemeProvider>;
+  return <>{children}</>;
 }
 
 export default function Providers({ children }) {
   return (
-    <StyledComponentsRegistry>
-      <Provider store={store}>
-        <PersistGate
-          loading={
-            <div className="min-h-screen bg-[#F5EDDE] dark:bg-[#1A1714] flex items-center justify-center text-[#68635D] dark:text-[#C2B9AB] font-sans text-sm">
-              Loading SpendScope…
-            </div>
-          }
-          persistor={persistor}
-        >
-          <ReduxThemeBridge>{children}</ReduxThemeBridge>
-        </PersistGate>
-      </Provider>
-    </StyledComponentsRegistry>
+    <Provider store={store}>
+      <PersistGate
+        loading={
+          <div className="min-h-screen bg-[#F5EDDE] dark:bg-[#1A1714] flex items-center justify-center text-[#68635D] dark:text-[#C2B9AB] font-sans text-sm">
+            Loading SpendScope…
+          </div>
+        }
+        persistor={persistor}
+      >
+        <ReduxThemeBridge>{children}</ReduxThemeBridge>
+      </PersistGate>
+    </Provider>
   );
 }

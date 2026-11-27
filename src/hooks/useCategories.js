@@ -39,8 +39,14 @@ export const useCategories = () => {
 
   useEffect(() => {
     getCategories();
-    const unsub = subscribeDataChanged(() => {
-      getCategories();
+    const unsub = subscribeDataChanged((detail) => {
+      if (
+        !detail?.storeName ||
+        detail.storeName === "categories" ||
+        detail.storeName === "transactions"
+      ) {
+        getCategories();
+      }
     });
     return unsub;
   }, [getCategories]);

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, Suspense } from "react";
+import dynamic from "next/dynamic";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   HiMagnifyingGlass,
@@ -30,41 +31,61 @@ import {
 import { useAccounts } from "@/hooks/useAccounts";
 import { getCurrencySymbol } from "@/utils/currencies";
 
+function CalcToolSkeleton() {
+  return (
+    <div className="space-y-4 animate-pulse" aria-busy="true">
+      <div className="h-10 rounded-2xl bg-[var(--home-track)]/70 w-2/3 mx-auto" />
+      <div className="rounded-3xl border border-[var(--home-border)] bg-[var(--home-card)] p-5 space-y-4">
+        <div className="h-10 rounded-xl bg-[var(--home-track)]/60" />
+        <div className="h-10 rounded-xl bg-[var(--home-track)]/60" />
+        <div className="h-10 rounded-xl bg-[var(--home-track)]/60" />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="h-12 rounded-2xl bg-[var(--home-track)]/60" />
+        <div className="h-12 rounded-2xl bg-[var(--home-accent)]/30" />
+      </div>
+    </div>
+  );
+}
+
+const dynamicCalc = (loader) =>
+  dynamic(loader, { ssr: false, loading: () => <CalcToolSkeleton /> });
+
 // EMI (4)
-import EmiC from "@/app/(private)/calculators-m/components/EmiC";
-import Qcalculator from "@/app/(private)/calculators-m/components/Qcalculator";
-import EmiAdvance from "@/app/(private)/calculators-m/components/EmiAdvance";
-import CompareLoan from "@/app/(private)/calculators-m/components/CompareLoan";
+const EmiC = dynamicCalc(() => import("@/app/(private)/calculators-m/components/EmiC"));
+const Qcalculator = dynamicCalc(() => import("@/app/(private)/calculators-m/components/Qcalculator"));
+const EmiAdvance = dynamicCalc(() => import("@/app/(private)/calculators-m/components/EmiAdvance"));
+const CompareLoan = dynamicCalc(() => import("@/app/(private)/calculators-m/components/CompareLoan"));
 
 // Banking (5)
-import FdCalculator from "@/app/(private)/calculators-m/components/FdCalculator";
-import RdCalculator from "@/app/(private)/calculators-m/components/RdCalculator";
-import PpfCalculator from "@/app/(private)/calculators-m/components/PpfCalculator";
-import InterestCalculator from "@/app/(private)/calculators-m/components/InterestCalculator";
-import InflationImpact from "@/app/(private)/calculators-m/components/InflationImpact";
+const FdCalculator = dynamicCalc(() => import("@/app/(private)/calculators-m/components/FdCalculator"));
+const RdCalculator = dynamicCalc(() => import("@/app/(private)/calculators-m/components/RdCalculator"));
+const PpfCalculator = dynamicCalc(() => import("@/app/(private)/calculators-m/components/PpfCalculator"));
+const InterestCalculator = dynamicCalc(() => import("@/app/(private)/calculators-m/components/InterestCalculator"));
+const InflationImpact = dynamicCalc(() => import("@/app/(private)/calculators-m/components/InflationImpact"));
 
 // SIP (5)
-import SipCalculator from "@/app/(private)/calculators-m/components/SipCalculator";
-import SwpCalculator from "@/app/(private)/calculators-m/components/SwpCalculator";
-import StpCalculator from "@/app/(private)/calculators-m/components/StpCalculator";
-import StepUpSipCalculator from "@/app/(private)/calculators-m/components/StepUpSipCalculator";
-import SipWithInflation from "@/app/(private)/calculators-m/components/SipWithInflation";
+const SipCalculator = dynamicCalc(() => import("@/app/(private)/calculators-m/components/SipCalculator"));
+const SwpCalculator = dynamicCalc(() => import("@/app/(private)/calculators-m/components/SwpCalculator"));
+const StpCalculator = dynamicCalc(() => import("@/app/(private)/calculators-m/components/StpCalculator"));
+const StepUpSipCalculator = dynamicCalc(() => import("@/app/(private)/calculators-m/components/StepUpSipCalculator"));
+const SipWithInflation = dynamicCalc(() => import("@/app/(private)/calculators-m/components/SipWithInflation"));
 
 // GST & VAT (2)
-import GstCalculator from "@/app/(private)/calculators-m/components/GstCalculator";
-import VatCalculator from "@/app/(private)/calculators-m/components/VatCalculator";
+const GstCalculator = dynamicCalc(() => import("@/app/(private)/calculators-m/components/GstCalculator"));
+const VatCalculator = dynamicCalc(() => import("@/app/(private)/calculators-m/components/VatCalculator"));
 
 // Loan (4 - v2 parity)
-import LoanProfileCalculator from "@/components/calculators/v2/LoanProfileCalculator";
-import PrePaymentRoiCalculator from "@/components/calculators/v2/PrePaymentRoiCalculator";
-import MoratoriumCalculator from "@/components/calculators/v2/MoratoriumCalculator";
-import LoanEligibleCalculator from "@/components/calculators/v2/LoanEligibleCalculator";
+const LoanProfileCalculator = dynamicCalc(() => import("@/components/calculators/v2/LoanProfileCalculator"));
+const PrePaymentRoiCalculator = dynamicCalc(() => import("@/components/calculators/v2/PrePaymentRoiCalculator"));
+const MoratoriumCalculator = dynamicCalc(() => import("@/components/calculators/v2/MoratoriumCalculator"));
+const LoanEligibleCalculator = dynamicCalc(() => import("@/components/calculators/v2/LoanEligibleCalculator"));
 
 // Other (4)
-import CashNoteCounter from "@/app/(private)/calculators-m/components/CashNoteCounter";
-import AmountToWord from "@/app/(private)/calculators-m/components/AmountToWord";
-import DiscountCalculator from "@/app/(private)/calculators-m/components/DiscountCalculator";
-import CurrencyConverter from "@/app/(private)/calculators-m/components/CurrencyConverter";
+const CashNoteCounter = dynamicCalc(() => import("@/app/(private)/calculators-m/components/CashNoteCounter"));
+const AmountToWord = dynamicCalc(() => import("@/app/(private)/calculators-m/components/AmountToWord"));
+const DiscountCalculator = dynamicCalc(() => import("@/app/(private)/calculators-m/components/DiscountCalculator"));
+const CurrencyConverter = dynamicCalc(() => import("@/app/(private)/calculators-m/components/CurrencyConverter"));
 
 export const CALCULATOR_CATEGORIES = [
   {

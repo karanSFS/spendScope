@@ -41,8 +41,15 @@ export const useTransactions = (options = {}) => {
   useEffect(() => {
     getTransactions();
 
-    const unsubData = subscribeDataChanged(() => {
-      getTransactions();
+    const unsubData = subscribeDataChanged((detail) => {
+      if (
+        !detail?.storeName ||
+        detail.storeName === "transactions" ||
+        detail.storeName === "categories" ||
+        detail.storeName === "accounts"
+      ) {
+        getTransactions();
+      }
     });
 
     const handleResetEvent = () => {
@@ -108,24 +115,24 @@ export const useTransactions = (options = {}) => {
   };
 
   const { totalIncome, totalExpense, balance } = useMemo(() => {
-    let income = 0;
-    let expense = 0;
+    let incomeMinor = 0;
+    let expenseMinor = 0;
 
     transactions.forEach((t) => {
       if (t.transfer_group_id) return;
-      const val = parseFloat(t.amount) || 0;
+      const minor = Math.round((parseFloat(t.amount) || 0) * 100);
       const kind = String(t.kind || t.type || "expense").toLowerCase();
       if (kind === "income") {
-        income += val;
+        incomeMinor += minor;
       } else {
-        expense += val;
+        expenseMinor += minor;
       }
     });
 
     return {
-      totalIncome: income,
-      totalExpense: expense,
-      balance: income - expense,
+      totalIncome: incomeMinor / 100,
+      totalExpense: expenseMinor / 100,
+      balance: (incomeMinor - expenseMinor) / 100,
     };
   }, [transactions]);
 

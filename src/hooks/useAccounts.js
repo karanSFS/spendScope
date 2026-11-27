@@ -45,8 +45,10 @@ export const useAccounts = () => {
 
   useEffect(() => {
     refreshAccounts();
-    const unsub = subscribeDataChanged(() => {
-      refreshAccounts();
+    const unsub = subscribeDataChanged((detail) => {
+      if (!detail?.storeName || detail.storeName === "accounts") {
+        refreshAccounts();
+      }
     });
     return unsub;
   }, [refreshAccounts]);

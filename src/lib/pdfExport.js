@@ -4,11 +4,15 @@
 
 import { getCurrencyConfig } from "@/utils/currencies";
 
+const ZERO_DECIMAL_CURRENCIES = new Set(["JPY", "KRW", "VND"]);
+
 function formatPdfMoney(value, currencyCode) {
   const num = Number(value) || 0;
-  const abs = Math.abs(num);
-  const rounded = Math.round((abs + Number.EPSILON) * 100) / 100;
   const config = getCurrencyConfig(currencyCode);
+  const decimals = ZERO_DECIMAL_CURRENCIES.has(config.code) ? 0 : 2;
+  const factor = Math.pow(10, decimals);
+  const abs = Math.abs(num);
+  const rounded = Math.round((abs + Number.EPSILON) * factor) / factor;
   // Helvetica standard WinAnsi encoding safely renders ASCII currency code alongside amount
   // when symbols like INR ₹ are outside WinAnsi range.
   const asciiSymbol = ["$", "€", "£", "¥", "A$", "C$", "S$", "R$"].includes(
@@ -17,10 +21,10 @@ function formatPdfMoney(value, currencyCode) {
     ? config.symbol
     : `${config.code} `;
   const formatted = new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
   }).format(rounded);
-  return `${num < 0 ? "-" : ""}${asciiSymbol}${formatted}`;
+  return `${rounded > 0 && num < 0 ? "-" : ""}${asciiSymbol}${formatted}`;
 }
 
 function sanitizeWinAnsi(text) {
@@ -79,30 +83,39 @@ export async function generateTransactionsPdf({
   );
   y -= 18;
 
-  // Separate totals (transfers excluded)
-  let totalIncome = 0;
-  let totalExpense = 0;
-  const expenseCategoryTotals = new Map();
-  const incomeCategoryTotals = new Map();
+  // Separate totals in integer minor units (transfers excluded)
+  let totalIncomeMinor = 0;
+  let totalExpenseMinor = 0;
+  const expenseCategoryMinor = new Map();
+  const incomeCategoryMinor = new Map();
 
   for (const tx of transactions) {
     if (tx.transfer_group_id) continue;
-    const amt = Number(tx.amount) || 0;
+    const amtMinor = Math.round((Number(tx.amount) || 0) * 100);
     const catName = tx.category || "Uncategorized";
     if (tx.kind === "income" || tx.type === "Income") {
-      totalIncome += amt;
-      incomeCategoryTotals.set(
+      totalIncomeMinor += amtMinor;
+      incomeCategoryMinor.set(
         catName,
-        (incomeCategoryTotals.get(catName) || 0) + amt,
+        (incomeCategoryMinor.get(catName) || 0) + amtMinor,
       );
     } else {
-      totalExpense += amt;
-      expenseCategoryTotals.set(
+      totalExpenseMinor += amtMinor;
+      expenseCategoryMinor.set(
         catName,
-        (expenseCategoryTotals.get(catName) || 0) + amt,
+        (expenseCategoryMinor.get(catName) || 0) + amtMinor,
       );
     }
   }
+
+  const totalIncome = Math.round(totalIncomeMinor) / 100;
+  const totalExpense = Math.round(totalExpenseMinor) / 100;
+  const expenseCategoryTotals = new Map(
+    Array.from(expenseCategoryMinor.entries()).map(([k, v]) => [k, v / 100]),
+  );
+  const incomeCategoryTotals = new Map(
+    Array.from(incomeCategoryMinor.entries()).map(([k, v]) => [k, v / 100]),
+  );
 
   // Summary box
   page.drawRectangle({

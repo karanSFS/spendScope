@@ -41,6 +41,7 @@ test.describe("Phase 3 Categories & Settings Flows", () => {
     await page.getByLabel("Transaction amount").fill("350");
     await page.getByRole("button", { name: "Specialty Coffee" }).click();
     await page.getByRole("button", { name: /Save Expense/i }).click();
+    await expect(page.getByRole("button", { name: /Save Expense/i })).toBeHidden();
     await expect(page.getByText("Specialty Coffee").first()).toBeVisible();
 
     await page.goto("/categories");

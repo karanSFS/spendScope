@@ -439,3 +439,125 @@ describe("calculatorEngine: Other Utility Calculators (4)", () => {
     expect(fx.convertedAmount).toBeCloseTo(92, 4);
   });
 });
+
+describe("calculatorEngine: Audit Edge Cases & Reconciliation", () => {
+  it("handles 0-decimal JPY, -0.001, NaN, and Infinity cleanly in formatCalcMoney", () => {
+    expect(formatCalcMoney(12345.67, "JPY", 2)).toBe("¥12,346");
+    expect(formatCalcMoney(-0.001, "INR", 2)).toBe("₹0.00");
+    expect(formatCalcMoney(NaN, "USD", 2)).toBe("$0.00");
+    expect(formatCalcMoney(Infinity, "USD", 2)).toBe("$0.00");
+  });
+
+  it("handles 0% interest and extreme tenures in calculateEmi & calculateEmiAdvance", () => {
+    const zeroEmi = calculateEmi({
+      principal: 120000,
+      annualRate: 0,
+      tenureMonths: 12,
+    });
+    expect(zeroEmi.emi).toBe(10000);
+    expect(zeroEmi.totalInterest).toBe(0);
+    expect(zeroEmi.schedule[11].balance).toBe(0);
+
+    const singleAdv = calculateEmiAdvance({
+      principal: 50000,
+      annualRate: 12,
+      tenureMonths: 1,
+      timing: "advance",
+      processingFee: 2,
+      gstPercent: 18,
+    });
+    expect(singleAdv.emi).toBeCloseTo(50000, 2);
+    expect(singleAdv.totalInterest).toBeCloseTo(0, 2);
+    expect(singleAdv.feeAmount).toBe(1000);
+    expect(singleAdv.gstOnFee).toBe(180);
+  });
+
+  it("Quick Loan Period mode never produces a final balloon payment > EMI and Interest mode converges for ultra-low rates", () => {
+    const res = calculateQuickLoan({
+      mode: "Period",
+      principal: 100000,
+      annualRate: 10,
+      emi: 5000,
+    });
+    const monthRows = res.schedule.filter((r) => r.type === "month");
+    for (const row of monthRows) {
+      expect(row.principal + row.interest).toBeLessThanOrEqual(5000.01);
+    }
+
+    const lowRate = calculateQuickLoan({
+      mode: "Interest",
+      principal: 100000,
+      periodYears: 1,
+      emi: calculateLoanEmi(100000, 0.01, 12),
+    });
+    expect(lowRate.interestRate).toBeCloseTo(0.01, 3);
+
+    const empty = calculateQuickLoan({
+      mode: "Period",
+      principal: 0,
+      annualRate: 10,
+      emi: 0,
+    });
+    expect(empty.schedule).toHaveLength(0);
+  });
+
+  it("RD multi-year schedule satisfies opening + invested + interest === closing every year", () => {
+    const rd = calculateRd({
+      monthlyDeposit: 5000,
+      annualRate: 7.5,
+      tenureMonths: 36,
+    });
+    expect(rd.schedule).toHaveLength(3);
+    let prevClosing = 0;
+    let sumInterest = 0;
+    for (const row of rd.schedule) {
+      expect(row.opening).toBeCloseTo(prevClosing, 4);
+      expect(row.opening + row.invested + row.interest).toBeCloseTo(row.closing, 4);
+      prevClosing = row.closing;
+      sumInterest += row.interest;
+    }
+    expect(sumInterest).toBeCloseTo(rd.totalInterest, 2);
+    expect(prevClosing).toBeCloseTo(rd.maturityAmount, 2);
+  });
+
+  it("Loan Profile & Moratorium guard against negative amortization and zero principal", () => {
+    const metrics = calculateLoanProfileMetrics(
+      {
+        principal_amount: 100000,
+        interest_rate: 12,
+        tenure_months: 12,
+        emi_amount: 500, // deliberately below monthly interest (1000)
+        loan_date: "2026-01-01",
+        first_emi_date: "2026-02-01",
+      },
+      new Date(2026, 4, 15),
+    );
+    expect(metrics.principalPaid).toBeGreaterThanOrEqual(0);
+    expect(Number.isFinite(metrics.outstandingPrincipal)).toBe(true);
+
+    const zeroMor = calculateMoratorium({
+      principal: 0,
+      annualRate: 0,
+      totalMonths: 12,
+      moratoriumMonths: 3,
+      option: "keep_emi",
+      paidInstallments: 0,
+    });
+    expect(Number.isNaN(zeroMor.moratorium.totalPayment)).toBe(false);
+    expect(zeroMor.moratorium.totalPayment).toBe(0);
+
+    const keepEmiMor = calculateMoratorium({
+      principal: 500000,
+      annualRate: 10,
+      totalMonths: 60,
+      moratoriumMonths: 3,
+      option: "keep_emi",
+      paidInstallments: 6,
+    });
+    expect(keepEmiMor.moratorium.isAmortizable).toBe(true);
+    expect(keepEmiMor.moratorium.totalInterest).toBeGreaterThan(
+      keepEmiMor.noMoratorium.totalInterest,
+    );
+    expect(keepEmiMor.moratorium.tenure).toBeGreaterThan(60);
+  });
+});

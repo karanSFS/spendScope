@@ -29,7 +29,6 @@
     "react-redux": "^9.2.0",
     "recharts": "^3.11.1",
     "redux-persist": "^6.0.0",
-    "styled-components": "^6.5.3",
     "tesseract.js": "^7.0.0"
   },
   "devDependencies": {

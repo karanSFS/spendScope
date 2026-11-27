@@ -47,8 +47,15 @@ export const useBuckets = (explicitAccountId) => {
 
   useEffect(() => {
     refreshBuckets();
-    const unsub = subscribeDataChanged(() => {
-      refreshBuckets();
+    const unsub = subscribeDataChanged((detail) => {
+      if (
+        !detail?.storeName ||
+        detail.storeName === "buckets" ||
+        detail.storeName === "bucket_transactions" ||
+        detail.storeName === "accounts"
+      ) {
+        refreshBuckets();
+      }
     });
     return unsub;
   }, [refreshBuckets]);
@@ -158,8 +165,14 @@ export const useBucketDetails = (bucketId) => {
 
   useEffect(() => {
     refresh();
-    const unsub = subscribeDataChanged(() => {
-      refresh();
+    const unsub = subscribeDataChanged((detail) => {
+      if (
+        !detail?.storeName ||
+        detail.storeName === "buckets" ||
+        detail.storeName === "bucket_transactions"
+      ) {
+        refresh();
+      }
     });
     return unsub;
   }, [refresh]);

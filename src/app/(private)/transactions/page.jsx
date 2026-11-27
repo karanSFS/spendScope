@@ -1,6 +1,14 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, Suspense } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useDeferredValue,
+  memo,
+  Suspense,
+} from "react";
 import { useSearchParams } from "next/navigation";
 import {
   HiPlus,
@@ -31,6 +39,82 @@ import ExportModal from "@/components/transactions/ExportModal";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import EmptyStateCard from "@/components/shared/EmptyStateCard";
 
+const PAGE_SIZE = 200;
+
+const TransactionRow = memo(function TransactionRow({
+  tx,
+  currencyCode,
+  onEdit,
+  onDelete,
+}) {
+  const isIncome = tx.kind === "income";
+  const isTransfer = Boolean(tx.transfer_group_id);
+  return (
+    <div className="min-h-[60px] py-3 flex items-center justify-between gap-3">
+      <div className="flex items-center gap-3 min-w-0">
+        <CategoryIcon
+          iconKey={tx.category_icon}
+          color={tx.color_code}
+          size={18}
+          withBadge
+          badgeSize={40}
+        />
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-bold text-[var(--home-text)] truncate">
+              {tx.category}
+            </span>
+            {isTransfer && (
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[var(--home-track)] text-[var(--home-text-muted)]">
+                Transfer
+              </span>
+            )}
+          </div>
+          {tx.note && (
+            <p className="text-xs text-[var(--home-text-muted)] truncate">
+              {tx.note}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 shrink-0">
+        <span
+          className={`font-mono-num text-sm font-bold ${
+            isTransfer
+              ? "text-[var(--home-text-secondary)]"
+              : isIncome
+                ? "text-[var(--home-income)]"
+                : "text-[var(--home-expense)]"
+          }`}
+        >
+          {isIncome ? "+" : "-"}
+          {formatMoney(tx.amount, currencyCode)}
+        </span>
+
+        {!isTransfer && (
+          <button
+            type="button"
+            aria-label="Edit transaction"
+            onClick={() => onEdit(tx)}
+            className="w-8 h-8 rounded-full flex items-center justify-center text-[var(--home-text-muted)] hover:text-[var(--home-text)] hover:bg-[var(--home-track)] cursor-pointer"
+          >
+            <HiOutlinePencilSquare className="w-4 h-4" />
+          </button>
+        )}
+        <button
+          type="button"
+          aria-label="Delete transaction"
+          onClick={() => onDelete(tx)}
+          className="w-8 h-8 rounded-full flex items-center justify-center text-[var(--home-text-muted)] hover:text-[var(--home-destructive)] hover:bg-[var(--home-track)] cursor-pointer"
+        >
+          <HiOutlineTrash className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+});
+
 function TransactionsContent() {
   const searchParams = useSearchParams();
   const { activeAccount, activeAccountId } = useAccounts();
@@ -49,6 +133,8 @@ function TransactionsContent() {
   const [anchorDate, setAnchorDate] = useState(() => toLocalDateKey(new Date()));
   const [customRange, setCustomRange] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const deferredSearch = useDeferredValue(searchQuery);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [typeFilter, setTypeFilter] = useState("all");
   const [selectedCategoryIds, setSelectedCategoryIds] = useState([]);
   const [revealHidden, setRevealHidden] = useState(false);
@@ -96,7 +182,7 @@ function TransactionsContent() {
   }, [period, anchorDate, customRange]);
 
   const filteredTransactions = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
+    const q = deferredSearch.trim().toLowerCase();
     return transactions
       .filter((tx) => {
         if (startKey && endKey && (tx.date < startKey || tx.date > endKey)) {
@@ -133,24 +219,42 @@ function TransactionsContent() {
     endKey,
     typeFilter,
     selectedCategoryIds,
-    searchQuery,
+    deferredSearch,
   ]);
 
+  // Reset pagination whenever the filtered result set changes shape
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [startKey, endKey, typeFilter, selectedCategoryIds, deferredSearch, activeAccountId]);
+
   const { totalIn, totalOut, transferCount } = useMemo(() => {
-    let inc = 0;
-    let exp = 0;
+    let incMinor = 0;
+    let expMinor = 0;
     let tr = 0;
     for (const tx of filteredTransactions) {
       if (tx.transfer_group_id) {
         tr++;
         continue;
       }
-      const amt = Number(tx.amount) || 0;
-      if (tx.kind === "income") inc += amt;
-      else exp += amt;
+      const amtMinor = Math.round((Number(tx.amount) || 0) * 100);
+      if (tx.kind === "income") incMinor += amtMinor;
+      else expMinor += amtMinor;
     }
-    return { totalIn: inc, totalOut: exp, transferCount: tr };
+    return {
+      totalIn: incMinor / 100,
+      totalOut: expMinor / 100,
+      transferCount: tr,
+    };
   }, [filteredTransactions]);
+
+  const hasMore = filteredTransactions.length > visibleCount;
+  const visibleTransactions = useMemo(
+    () =>
+      hasMore
+        ? filteredTransactions.slice(0, visibleCount)
+        : filteredTransactions,
+    [filteredTransactions, visibleCount, hasMore],
+  );
 
   const groupedByDate = useMemo(() => {
     const groups = new Map();
@@ -159,7 +263,7 @@ function TransactionsContent() {
     yest.setDate(yest.getDate() - 1);
     const yesterdayKey = toLocalDateKey(yest);
 
-    for (const tx of filteredTransactions) {
+    for (const tx of visibleTransactions) {
       const key = tx.date || todayKey;
       let label = key;
       if (key === todayKey) label = "Today";
@@ -178,7 +282,12 @@ function TransactionsContent() {
       groups.get(key).items.push(tx);
     }
     return Array.from(groups.values());
-  }, [filteredTransactions]);
+  }, [visibleTransactions]);
+
+  const handleEditTx = useCallback((tx) => {
+    setEditingTx(tx);
+    setTxModalOpen(true);
+  }, []);
 
   const isHiddenMasked =
     Boolean(activeAccount?.hide_transactions) && !revealHidden;
@@ -373,83 +482,28 @@ function TransactionsContent() {
               </div>
 
               <div className="divide-y divide-[var(--home-border)] px-4 sm:px-5">
-                {group.items.map((tx) => {
-                  const isIncome = tx.kind === "income";
-                  const isTransfer = Boolean(tx.transfer_group_id);
-                  return (
-                    <div
-                      key={tx.id}
-                      className="min-h-[60px] py-3 flex items-center justify-between gap-3"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <CategoryIcon
-                          iconKey={tx.category_icon}
-                          color={tx.color_code}
-                          size={18}
-                          withBadge
-                          badgeSize={40}
-                        />
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold text-[var(--home-text)] truncate">
-                              {tx.category}
-                            </span>
-                            {isTransfer && (
-                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[var(--home-track)] text-[var(--home-text-muted)]">
-                                Transfer
-                              </span>
-                            )}
-                          </div>
-                          {tx.note && (
-                            <p className="text-xs text-[var(--home-text-muted)] truncate">
-                              {tx.note}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span
-                          className={`font-mono-num text-sm font-bold ${
-                            isTransfer
-                              ? "text-[var(--home-text-secondary)]"
-                              : isIncome
-                                ? "text-[var(--home-income)]"
-                                : "text-[var(--home-expense)]"
-                          }`}
-                        >
-                          {isIncome ? "+" : "-"}
-                          {formatMoney(tx.amount, currencyCode)}
-                        </span>
-
-                        {!isTransfer && (
-                          <button
-                            type="button"
-                            aria-label="Edit transaction"
-                            onClick={() => {
-                              setEditingTx(tx);
-                              setTxModalOpen(true);
-                            }}
-                            className="w-8 h-8 rounded-full flex items-center justify-center text-[var(--home-text-muted)] hover:text-[var(--home-text)] hover:bg-[var(--home-track)] cursor-pointer"
-                          >
-                            <HiOutlinePencilSquare className="w-4 h-4" />
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          aria-label="Delete transaction"
-                          onClick={() => setDeleteTarget(tx)}
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-[var(--home-text-muted)] hover:text-[var(--home-destructive)] hover:bg-[var(--home-track)] cursor-pointer"
-                        >
-                          <HiOutlineTrash className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+                {group.items.map((tx) => (
+                  <TransactionRow
+                    key={tx.id}
+                    tx={tx}
+                    currencyCode={currencyCode}
+                    onEdit={handleEditTx}
+                    onDelete={setDeleteTarget}
+                  />
+                ))}
               </div>
             </div>
           ))}
+
+          {hasMore && (
+            <button
+              type="button"
+              onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+              className="w-full py-3 rounded-full border border-[var(--home-border)] bg-[var(--home-card)] text-xs font-semibold text-[var(--home-text)] hover:border-[var(--home-accent)] cursor-pointer"
+            >
+              Show more ({filteredTransactions.length - visibleCount} remaining)
+            </button>
+          )}
         </div>
       )}
 

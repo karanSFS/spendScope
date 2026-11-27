@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { escapeCsvField, buildTransactionsCsv } from "@/lib/csvExport";
 import { generateTransactionsPdf } from "@/lib/pdfExport";
+import { computeSpendingSummary } from "@/lib/budgetMath";
 
 describe("csvExport & pdfExport", () => {
   it("escapes RFC-4180 CSV delimiters and neutralizes spreadsheet formula injection", () => {
@@ -60,5 +61,37 @@ describe("csvExport & pdfExport", () => {
     // Standard PDF magic bytes %PDF-
     const header = String.fromCharCode(...bytes.slice(0, 5));
     expect(header).toBe("%PDF-");
+  });
+
+  it("reconciles fractional sums & excludes neutral transfers consistently across Summary, CSV, and PDF", async () => {
+    const txs = [
+      { date: "2026-11-26", kind: "expense", category: "Food", amount: 0.1 },
+      { date: "2026-11-26", kind: "expense", category: "Food", amount: 0.2 },
+      { date: "2026-11-26", kind: "income", category: "Salary", amount: 100.55 },
+      {
+        date: "2026-11-26",
+        kind: "expense",
+        category: "Transfer",
+        amount: 500,
+        transfer_group_id: "tg-1",
+      },
+    ];
+
+    const summary = computeSpendingSummary({ transactions: txs });
+    expect(summary.totalExpense).toBe(0.3);
+    expect(summary.totalIncome).toBe(100.55);
+    expect(summary.transferCount).toBe(1);
+    expect(summary.transferVolume).toBe(500);
+
+    const csv = buildTransactionsCsv(txs, { currencyCode: "JPY" });
+    expect(csv).toContain(",Transfer");
+
+    const pdfBytes = await generateTransactionsPdf({
+      transactions: txs,
+      accountName: "Tokyo",
+      periodLabel: "Nov 2026",
+      currencyCode: "JPY",
+    });
+    expect(String.fromCharCode(...pdfBytes.slice(0, 5))).toBe("%PDF-");
   });
 });

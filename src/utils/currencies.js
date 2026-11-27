@@ -98,6 +98,8 @@ export const getCurrencyConfig = (currencyCode = "INR") => {
   return CURRENCIES.find((c) => c.code === code) || DEFAULT_CURRENCY;
 };
 
+const ZERO_DECIMAL_CURRENCIES = new Set(["JPY", "KRW", "VND"]);
+
 /**
  * Formats an amount using the active account currency without Android's
  * [0.0, 0.1] * 100 truncation bug.
@@ -110,13 +112,19 @@ export const formatMoney = (
   const num = Number(value);
   const safe = Number.isFinite(num) ? num : 0;
   const config = getCurrencyConfig(currencyCode);
+  const maxFrac = ZERO_DECIMAL_CURRENCIES.has(config.code)
+    ? 0
+    : maximumFractionDigits;
+  const minFrac = Math.min(minimumFractionDigits, maxFrac);
+  const factor = Math.pow(10, maxFrac);
   const abs = Math.abs(safe);
-  const rounded = Math.round((abs + Number.EPSILON) * 100) / 100;
+  const rounded = Math.round((abs + Number.EPSILON) * factor) / factor;
   const formattedNumber = new Intl.NumberFormat(config.locale, {
-    minimumFractionDigits,
-    maximumFractionDigits,
+    minimumFractionDigits: minFrac,
+    maximumFractionDigits: maxFrac,
   }).format(rounded);
 
-  const prefix = safe < 0 ? "-" : showSign && safe > 0 ? "+" : "";
+  const prefix =
+    rounded > 0 && safe < 0 ? "-" : showSign && rounded > 0 && safe > 0 ? "+" : "";
   return `${prefix}${config.symbol}${formattedNumber}`;
 };

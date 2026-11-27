@@ -89,9 +89,9 @@ export function calculateEmi({
 function solveAnnualRateBisection(P, n, E) {
   if (P <= 0 || n <= 0 || E <= 0) return 0;
   if (E * n <= P) return 0;
-  let low = 0.00001;
+  let low = 1e-9;
   let high = 5.0;
-  for (let i = 0; i < 70; i++) {
+  for (let i = 0; i < 80; i++) {
     const mid = (low + high) / 2;
     const factor = Math.pow(1 + mid, n);
     const emiGuess = (P * mid * factor) / (factor - 1);
@@ -137,7 +137,7 @@ export function calculateQuickLoan({
       if (r > 0) {
         if (E > P * r) {
           const exactMonths = Math.log(E / (E - P * r)) / Math.log(1 + r);
-          n = Math.max(1, Math.min(600, Math.round(exactMonths)));
+          n = Math.max(1, Math.min(600, Math.ceil(exactMonths - 1e-9)));
           Y = n / 12;
         } else {
           warning = "EMI is too low to cover monthly interest.";
@@ -145,7 +145,7 @@ export function calculateQuickLoan({
           Y = 50;
         }
       } else {
-        n = Math.max(1, Math.min(600, Math.round(P / E)));
+        n = Math.max(1, Math.min(600, Math.ceil(P / E - 1e-9)));
         Y = n / 12;
       }
     }
@@ -161,46 +161,48 @@ export function calculateQuickLoan({
   let totalInterest = 0;
   let totalPaid = 0;
 
-  for (let m = 1; m <= n; m++) {
-    const monthlyInterest = currentBalance * r;
-    let monthlyPrincipal = E - monthlyInterest;
+  if (P > 0 && E > 0) {
+    for (let m = 1; m <= n; m++) {
+      const monthlyInterest = currentBalance * r;
+      let monthlyPrincipal = E - monthlyInterest;
 
-    if (m === n || currentBalance - monthlyPrincipal < 0.01) {
-      monthlyPrincipal = currentBalance;
-    }
-    // Guard against negative amortization if EMI < monthly interest
-    if (monthlyPrincipal < 0) {
-      monthlyPrincipal = 0;
-    }
+      if (m === n || currentBalance - monthlyPrincipal < 0.01) {
+        monthlyPrincipal = currentBalance;
+      }
+      // Guard against negative amortization if EMI < monthly interest
+      if (monthlyPrincipal < 0) {
+        monthlyPrincipal = 0;
+      }
 
-    const actualPaymentThisMonth = monthlyPrincipal + monthlyInterest;
-    const remaining = Math.max(0, currentBalance - monthlyPrincipal);
+      const actualPaymentThisMonth = monthlyPrincipal + monthlyInterest;
+      const remaining = Math.max(0, currentBalance - monthlyPrincipal);
 
-    totalInterest += monthlyInterest;
-    totalPaid += actualPaymentThisMonth;
-    yearlyPrincipal += monthlyPrincipal;
-    yearlyInterest += monthlyInterest;
+      totalInterest += monthlyInterest;
+      totalPaid += actualPaymentThisMonth;
+      yearlyPrincipal += monthlyPrincipal;
+      yearlyInterest += monthlyInterest;
 
-    schedule.push({
-      type: "month",
-      month: m,
-      principal: monthlyPrincipal,
-      interest: monthlyInterest,
-      balance: remaining,
-    });
-
-    currentBalance = remaining;
-
-    if (m % 12 === 0 || m === n) {
       schedule.push({
-        type: "yearly_total",
-        year: Math.ceil(m / 12),
-        principal: yearlyPrincipal,
-        interest: yearlyInterest,
+        type: "month",
+        month: m,
+        principal: monthlyPrincipal,
+        interest: monthlyInterest,
         balance: remaining,
       });
-      yearlyPrincipal = 0;
-      yearlyInterest = 0;
+
+      currentBalance = remaining;
+
+      if (m % 12 === 0 || m === n) {
+        schedule.push({
+          type: "yearly_total",
+          year: Math.ceil(m / 12),
+          principal: yearlyPrincipal,
+          interest: yearlyInterest,
+          balance: remaining,
+        });
+        yearlyPrincipal = 0;
+        yearlyInterest = 0;
+      }
     }
   }
 
@@ -571,26 +573,27 @@ export function calculateRd({
 
   const schedule = [];
   const scheduleYears = Math.max(1, Math.ceil(totalMonths / 12));
-  let cumInvested = 0;
+  let prevClosing = 0;
 
   for (let yr = 1; yr <= scheduleYears; yr++) {
     const monthsUpToYr = Math.min(totalMonths, yr * 12);
     const monthsInYr = monthsUpToYr - (yr - 1) * 12;
     const yrInvestment = P * monthsInYr;
-    cumInvested += yrInvestment;
 
     let yrMaturity = 0;
     for (let i = 1; i <= monthsUpToYr; i++) {
       const remQuarters = (monthsUpToYr - i + 1) / 3;
       yrMaturity += P * Math.pow(1 + quarterlyRate, remQuarters);
     }
+    const yrInterest = Math.max(0, yrMaturity - prevClosing - yrInvestment);
     schedule.push({
       year: yr,
-      opening: cumInvested - yrInvestment,
+      opening: prevClosing,
       invested: yrInvestment,
-      interest: Math.max(0, yrMaturity - cumInvested),
+      interest: yrInterest,
       closing: yrMaturity,
     });
+    prevClosing = yrMaturity;
   }
 
   return {
@@ -1223,7 +1226,7 @@ export function calculateLoanProfileMetrics(loan, asOfDate = new Date()) {
 
   for (let m = 1; m <= tenure; m++) {
     const monthInterest = balance * r;
-    let monthPrincipal = emi - monthInterest;
+    let monthPrincipal = Math.max(0, emi - monthInterest);
     if (m === tenure || balance - monthPrincipal < 0.01) {
       monthPrincipal = balance;
     }
@@ -1277,7 +1280,7 @@ export function buildLoanAmortizationSchedule(loan) {
   for (let m = 1; m <= tenure; m++) {
     const dueDateKey = addMonthsToDateKey(firstKey, m - 1);
     const interest = balance * r;
-    let principalPart = emi - interest;
+    let principalPart = Math.max(0, emi - interest);
     if (m === tenure || balance - principalPart < 0.01) {
       principalPart = balance;
     }
@@ -1507,13 +1510,32 @@ export function calculateMoratorium({
     totalPayment: baseTotalPayment,
   };
 
+  if (P <= 0 || baseEmi <= 0) {
+    return {
+      option,
+      noMoratorium,
+      moratorium: {
+        isAmortizable: true,
+        totalPrincipal: 0,
+        monthlyEmi: 0,
+        tenure: months,
+        remainingMonths: Math.max(1, months - paid),
+        totalInterest: 0,
+        totalPayment: 0,
+      },
+    };
+  }
+
   // Amortize installments paid BEFORE moratorium starts (when paid > 0 in option 1 or generally)
   let remainingPrincipalBeforeMor = P;
   let paidSoFar = 0;
   if (paid > 0) {
     for (let m = 1; m <= paid; m++) {
       const mInt = remainingPrincipalBeforeMor * r;
-      const mPrin = Math.min(remainingPrincipalBeforeMor, baseEmi - mInt);
+      const mPrin = Math.min(
+        remainingPrincipalBeforeMor,
+        Math.max(0, baseEmi - mInt),
+      );
       remainingPrincipalBeforeMor = Math.max(0, remainingPrincipalBeforeMor - mPrin);
       paidSoFar += baseEmi;
     }
@@ -1523,16 +1545,19 @@ export function calculateMoratorium({
 
   if (option === "keep_emi") {
     let isAmortizable = true;
-    let newRemainingMonths = 0;
+    let exactRemainingMonths = 0;
+    let remainingInterestAfterMor = 0;
 
     if (r === 0) {
-      newRemainingMonths = Math.max(1, Math.round(compoundedPrincipal / baseEmi));
+      exactRemainingMonths = compoundedPrincipal / baseEmi;
+      remainingInterestAfterMor = 0;
     } else if (baseEmi <= compoundedPrincipal * r) {
       isAmortizable = false;
     } else {
-      const exactRem =
-        -Math.log(1 - (compoundedPrincipal * r) / baseEmi) / Math.log(1 + r);
-      newRemainingMonths = Math.max(1, Math.round(exactRem));
+      const amort = amortizationMonthsAndInterest(compoundedPrincipal, baseEmi, r);
+      isAmortizable = amort.isFinite;
+      exactRemainingMonths = amort.months;
+      remainingInterestAfterMor = amort.totalInterest;
     }
 
     if (!isAmortizable) {
@@ -1552,8 +1577,9 @@ export function calculateMoratorium({
       };
     }
 
+    const newRemainingMonths = Math.max(1, Math.ceil(exactRemainingMonths - 1e-9));
     const totalNewMonths = paid + newRemainingMonths;
-    const totalPayment = paidSoFar + baseEmi * newRemainingMonths;
+    const totalPayment = paidSoFar + compoundedPrincipal + remainingInterestAfterMor;
     const totalInterest = Math.max(0, totalPayment - P);
 
     return {

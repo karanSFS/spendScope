@@ -321,7 +321,7 @@ export default function AppShell({ children }) {
       {/* MAIN COLUMN */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* TOP UTILITY BAR */}
-        <header className="sticky top-0 z-20 h-16 px-3 sm:px-6 border-b border-[var(--home-border)] bg-[var(--home-card)]/90 backdrop-blur-md flex items-center justify-between gap-2">
+        <header className="sticky top-0 z-20 h-16 px-3 sm:px-6 border-b border-[var(--home-border)] bg-[var(--home-card)]/90 backdrop-blur-md flex items-center justify-between gap-3">
           {/* Left: Mobile Logo + Active Account Pill */}
           <div className="flex items-center gap-2.5 min-w-0">
             <Link
@@ -340,7 +340,7 @@ export default function AppShell({ children }) {
               <button
                 type="button"
                 onClick={() => setAccountMenuOpen((o) => !o)}
-                className="h-10 max-w-[200px] sm:max-w-[260px] px-3 rounded-full border border-[var(--home-border)] bg-[var(--home-background)] hover:border-[var(--home-accent)]/60 flex items-center gap-2 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
+                className="h-10 max-w-[200px] sm:max-w-[260px] px-3 rounded-full border border-[var(--home-border-strong)] bg-[var(--home-track)] shadow-xs hover:border-[var(--home-accent)] flex items-center gap-2 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
                 aria-label="Switch active account"
               >
                 <AvatarBadge
@@ -419,7 +419,7 @@ export default function AppShell({ children }) {
           </div>
 
           {/* Right: Sync + Theme + User / Guest Controls */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <div className="hidden sm:block lg:hidden">{renderSyncPill(false)}</div>
 
             {/* Light/Dark quick toggle */}
@@ -427,7 +427,7 @@ export default function AppShell({ children }) {
               type="button"
               onClick={() => dispatch(changeTheme(isDark ? "light" : "dark"))}
               aria-label={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-              className="w-10 h-10 rounded-full border border-[var(--home-border)] bg-[var(--home-background)] flex items-center justify-center text-[var(--home-text-secondary)] hover:text-[var(--home-text)] transition-colors cursor-pointer"
+              className="w-10 h-10 rounded-full border border-[var(--home-border-strong)] bg-[var(--home-track)] shadow-xs flex items-center justify-center text-[var(--home-text-secondary)] hover:text-[var(--home-text)] transition-colors cursor-pointer"
               title={isDark ? "Light Mode" : "Dark Mode"}
             >
               {isDark ? (
@@ -442,7 +442,7 @@ export default function AppShell({ children }) {
               type="button"
               onClick={() => setThemeModalOpen((o) => !o)}
               aria-label="Appearance and accent colors"
-              className="w-10 h-10 rounded-full border border-[var(--home-border)] bg-[var(--home-background)] flex items-center justify-center text-[var(--home-text-secondary)] hover:text-[var(--home-text)] transition-colors cursor-pointer"
+              className="w-10 h-10 rounded-full border border-[var(--home-border-strong)] bg-[var(--home-track)] shadow-xs flex items-center justify-center text-[var(--home-text-secondary)] hover:text-[var(--home-text)] transition-colors cursor-pointer"
               title="Appearance & Accent"
             >
               <IoColorPaletteOutline className="w-4.5 h-4.5" />
@@ -462,7 +462,7 @@ export default function AppShell({ children }) {
                 <button
                   type="button"
                   onClick={() => setUserMenuOpen((o) => !o)}
-                  className="h-10 pl-1.5 pr-2.5 rounded-full border border-[var(--home-border)] bg-[var(--home-background)] flex items-center gap-2 hover:border-[var(--home-accent)]/60 transition-colors cursor-pointer"
+                  className="h-10 pl-1.5 pr-2.5 rounded-full border border-[var(--home-border-strong)] bg-[var(--home-track)] shadow-xs flex items-center gap-2 hover:border-[var(--home-accent)] transition-colors cursor-pointer"
                   aria-expanded={userMenuOpen}
                 >
                   <AvatarBadge

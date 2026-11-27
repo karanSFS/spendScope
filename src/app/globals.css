@@ -12,6 +12,7 @@
   --home-background: #F5EDDE;
   --home-card: #FBF7EF;
   --home-border: #E1DACD;
+  --home-border-strong: #CFC4B0;
   --home-track: #E5DECE;
   --home-accent: #C88856;
   --home-on-accent: #FFFDFA;
@@ -41,6 +42,7 @@ html.dark {
   --home-background: #1A1714;
   --home-card: #24201C;
   --home-border: #3A342D;
+  --home-border-strong: #4C443A;
   --home-track: #332D27;
   --home-accent: #D99A6C;
   --home-on-accent: #FFFDFA;

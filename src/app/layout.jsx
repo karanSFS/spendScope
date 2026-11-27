@@ -27,9 +27,6 @@ export const metadata = {
   title: "SpendScope — Calm Editorial Expense & Budget Tracking",
   description:
     "Track daily expenses, organize Spend Buckets, monitor multi-account balances, and run 24+ financial calculators — private locally or synced across Web and Android.",
-  icons: {
-    icon: "/favicon.ico",
-  },
 };
 
 export default function RootLayout({ children }) {

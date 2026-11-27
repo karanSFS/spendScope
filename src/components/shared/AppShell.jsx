@@ -197,7 +197,7 @@ export default function AppShell({ children }) {
       return (
         <Link
           href="/sign-in"
-          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold border border-[var(--home-border)] bg-[var(--home-background)] text-[var(--home-text-secondary)] hover:text-[var(--home-text)] transition-colors"
+          className="inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 rounded-full text-xs font-semibold border border-[var(--home-border-strong)] bg-[var(--home-track)] shadow-xs text-[var(--home-text-secondary)] hover:text-[var(--home-text)] transition-colors"
           title="Stored locally on this device. Sign in to enable cloud backup."
         >
           <HiOutlineCloud className="w-3.5 h-3.5 text-[var(--home-text-muted)] shrink-0" />
@@ -228,7 +228,7 @@ export default function AppShell({ children }) {
       <button
         type="button"
         onClick={() => userId && syncNow(userId)}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold border border-[var(--home-border)] bg-[var(--home-background)] text-[var(--home-text-secondary)] hover:text-[var(--home-text)] transition-colors cursor-pointer"
+        className="inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 rounded-full text-xs font-semibold border border-[var(--home-border-strong)] bg-[var(--home-track)] shadow-xs text-[var(--home-text-secondary)] hover:text-[var(--home-text)] transition-colors cursor-pointer"
         title={syncStatus?.lastError || "Click to sync now"}
       >
         {icon}
@@ -323,24 +323,24 @@ export default function AppShell({ children }) {
         {/* TOP UTILITY BAR */}
         <header className="sticky top-0 z-20 h-16 px-3 sm:px-6 border-b border-[var(--home-border)] bg-[var(--home-card)]/90 backdrop-blur-md flex items-center justify-between gap-3">
           {/* Left: Mobile Logo + Active Account Pill */}
-          <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex flex-1 items-center gap-2.5 min-w-0">
             <Link
               href="/dashboard"
               className="flex lg:hidden items-center gap-2 shrink-0"
             >
               <SpendScopeLogo className="w-7 h-7" />
-              <span className="font-display text-lg hidden sm:inline">
+              <span className="font-display text-lg hidden md:inline">
                 <span className="text-[var(--home-accent)]">Spend</span>
                 <span className="text-[var(--home-text)]">Scope</span>
               </span>
             </Link>
 
             {/* Account Switcher Pill */}
-            <div className="relative min-w-0" ref={accountRef}>
+            <div className="relative min-w-0 max-w-full" ref={accountRef}>
               <button
                 type="button"
                 onClick={() => setAccountMenuOpen((o) => !o)}
-                className="h-10 max-w-[200px] sm:max-w-[260px] px-3 rounded-full border border-[var(--home-border-strong)] bg-[var(--home-track)] shadow-xs hover:border-[var(--home-accent)] flex items-center gap-2 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
+                className="h-10 max-w-[min(100%,260px)] min-w-[88px] px-3 rounded-full border border-[var(--home-border-strong)] bg-[var(--home-track)] shadow-xs hover:border-[var(--home-accent)] flex items-center gap-2 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
                 aria-label="Switch active account"
               >
                 <AvatarBadge
@@ -348,10 +348,10 @@ export default function AppShell({ children }) {
                   name={activeAccount?.name || "Default"}
                   size={20}
                 />
-                <span className="truncate text-[var(--home-text)]">
+                <span className="min-w-0 truncate text-[var(--home-text)]">
                   {activeAccount?.name || "Default"}
                 </span>
-                <span className="hidden xs:inline text-[11px] font-mono-num text-[var(--home-text-muted)] shrink-0">
+                <span className="hidden md:inline text-[11px] font-mono-num text-[var(--home-text-muted)] shrink-0">
                   {activeAccount?.currency_code || defaultCurrency || "INR"}
                 </span>
                 <HiOutlineChevronDown className="w-3.5 h-3.5 text-[var(--home-text-muted)] shrink-0" />
@@ -420,7 +420,7 @@ export default function AppShell({ children }) {
 
           {/* Right: Sync + Theme + User / Guest Controls */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            <div className="hidden sm:block lg:hidden">{renderSyncPill(false)}</div>
+            <div className="hidden md:block lg:hidden">{renderSyncPill(false)}</div>
 
             {/* Light/Dark quick toggle */}
             <button

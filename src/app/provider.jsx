@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef } from "react";
 import { Provider, useDispatch, useSelector } from "react-redux";
 import { PersistGate } from "redux-persist/integration/react";
 import { store, persistor } from "../redux";
+import AppLoader from "@/components/shared/AppLoader";
 import { buildTheme } from "@/utils/theme";
 import {
   setAuthSession,
@@ -207,14 +208,7 @@ function ReduxThemeBridge({ children }) {
 export default function Providers({ children }) {
   return (
     <Provider store={store}>
-      <PersistGate
-        loading={
-          <div className="min-h-screen bg-[#F5EDDE] dark:bg-[#1A1714] flex items-center justify-center text-[#68635D] dark:text-[#C2B9AB] font-sans text-sm">
-            Loading SpendScope…
-          </div>
-        }
-        persistor={persistor}
-      >
+      <PersistGate loading={<AppLoader />} persistor={persistor}>
         <ReduxThemeBridge>{children}</ReduxThemeBridge>
       </PersistGate>
     </Provider>

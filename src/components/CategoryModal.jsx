@@ -1,78 +1,66 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useSelector } from "react-redux";
-import { useTheme } from "styled-components";
-import {
-  HiPlus,
-  HiPencilSquare,
-  HiXMark,
-  HiArrowPath,
-  HiExclamationTriangle,
-  HiCheck,
-} from "react-icons/hi2";
-import { theme as defaultTheme, colors as themeColors } from "@/utils/theme";
-
-const PRESET_COLORS =
-  themeColors && themeColors.length > 0
-    ? themeColors.slice(0, 10)
-    : [defaultTheme.colors.primary];
+import { HiXMark, HiOutlineSwatch, HiOutlineSquares2X2 } from "react-icons/hi2";
+import CategoryIcon from "@/components/shared/CategoryIcon";
+import IconPickerModal from "@/components/shared/IconPickerModal";
+import ColorPickerModal from "@/components/shared/ColorPickerModal";
 
 export default function CategoryModal({
   isOpen,
   onClose,
-  categories = [],
   createCategory,
   updateCategory,
-  deleteCategory,
   initialEditCategory = null,
   initialType = "Expense",
 }) {
-  const themeState = useSelector((state) => state?.themeSlice || state?.theme);
-  const themeContext = useTheme();
-  const currentTheme = themeContext?.colors ? themeContext : themeState;
+  const isEditing = Boolean(initialEditCategory?.id);
 
-  const primaryColor =
-    currentTheme?.colors?.primary || themeState?.colors?.primary || defaultTheme.colors.primary;
-  const isDark = currentTheme?.mode === "dark" || themeState?.mode === "dark";
-
-  // Form states
-  const [editingCategory, setEditingCategory] = useState(null);
   const [nameInput, setNameInput] = useState("");
-  const [typeInput, setTypeInput] = useState(initialType || "Expense");
-  const [colorInput, setColorInput] = useState(primaryColor);
+  const [kindInput, setKindInput] = useState("expense");
+  const [iconKey, setIconKey] = useState("other");
+  const [colorInput, setColorInput] = useState("#C88856");
+  const [iconPickerOpen, setIconPickerOpen] = useState(false);
+  const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const [formError, setFormError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (initialEditCategory) {
-      setEditingCategory(initialEditCategory);
-      setNameInput(initialEditCategory.name || "");
-      setTypeInput(initialEditCategory.type || "Expense");
-      setColorInput(initialEditCategory.color_code || primaryColor);
-    } else {
-      setEditingCategory(null);
-      setNameInput("");
-      setTypeInput(initialType || "Expense");
-      setColorInput(initialType === "Income" ? "#10B981" : primaryColor);
-    }
+    if (!isOpen) return;
     setFormError("");
-  }, [initialEditCategory, initialType, isOpen, primaryColor]);
+    if (initialEditCategory) {
+      setNameInput(initialEditCategory.name || "");
+      setKindInput(
+        String(initialEditCategory.kind || initialEditCategory.type || "expense").toLowerCase() ===
+          "income"
+          ? "income"
+          : "expense",
+      );
+      setIconKey(
+        initialEditCategory.icon_key || initialEditCategory.icon || "other",
+      );
+      setColorInput(
+        initialEditCategory.color || initialEditCategory.color_code || "#C88856",
+      );
+    } else {
+      const normalized =
+        String(initialType || "expense").toLowerCase() === "income"
+          ? "income"
+          : "expense";
+      setNameInput("");
+      setKindInput(normalized);
+      setIconKey(normalized === "income" ? "salary" : "other");
+      setColorInput(normalized === "income" ? "#6C7555" : "#C88856");
+    }
+  }, [initialEditCategory, initialType, isOpen]);
 
   if (!isOpen) return null;
-
-  const handleCancel = () => {
-    setEditingCategory(null);
-    setNameInput("");
-    setFormError("");
-    onClose();
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     const trimmed = nameInput.trim();
     if (!trimmed) {
-      setFormError("Please enter a category name.");
+      setFormError("Category name is required.");
       return;
     }
 
@@ -81,196 +69,200 @@ export default function CategoryModal({
 
     const payload = {
       name: trimmed,
-      type: typeInput,
-      icon: "🏷️",
-      color_code: colorInput,
+      kind: kindInput,
+      type: kindInput === "income" ? "Income" : "Expense",
+      icon_key: iconKey,
+      color: colorInput,
     };
 
-    if (editingCategory) {
-      const res = await updateCategory(editingCategory.id, payload);
-      setIsSubmitting(false);
-      if (res.success) {
-        handleCancel();
+    try {
+      const res = isEditing
+        ? await updateCategory(initialEditCategory.id, payload)
+        : await createCategory(payload);
+
+      if (res?.success) {
+        onClose?.();
       } else {
-        setFormError(res.error || "Failed to update category.");
+        setFormError(res?.error || "Unable to save category.");
       }
-    } else {
-      const res = await createCategory(payload);
+    } finally {
       setIsSubmitting(false);
-      if (res.success) {
-        handleCancel();
-      } else {
-        setFormError(res.error || "Failed to create category.");
-      }
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+    <>
       <div
-        className={`relative border rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150 my-auto ${
-          isDark
-            ? "bg-[#121118] border-[#1f1e2b] text-white"
-            : "bg-white border-gray-200 text-gray-900"
-        }`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={isEditing ? "Edit Category" : "New Category"}
+        className="fixed inset-0 z-[9998] bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4"
+        onClick={onClose}
       >
-        {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#1f1e2b] pb-3">
-          <div>
-            <h3 className="text-lg font-extrabold tracking-tight">
-              {editingCategory ? "Edit Category" : "Add New Category"}
+        <div
+          className="w-full max-w-md rounded-[28px] border border-[var(--home-border)] bg-[var(--home-card)] text-[var(--home-text)] p-6 shadow-2xl space-y-5"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between">
+            <h3 className="font-display text-xl">
+              {isEditing ? "Edit Category" : "New Category"}
             </h3>
-            <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
-              {editingCategory
-                ? "Update your customized category details."
-                : "Create a new custom category for your transactions."}
-            </p>
-          </div>
-          <button
-            onClick={handleCancel}
-            className={`p-1.5 rounded-xl transition-colors cursor-pointer ${
-              isDark
-                ? "text-slate-400 hover:text-white hover:bg-[#1a1926]"
-                : "text-gray-400 hover:text-gray-700 hover:bg-gray-100"
-            }`}
-          >
-            <HiXMark className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Add / Edit Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Type Toggle */}
-          <div>
-            <label className="block text-[11px] font-bold text-gray-500 dark:text-slate-400 mb-1.5 uppercase tracking-wider">
-              Category Type
-            </label>
-            <div className="flex items-center p-1 rounded-xl bg-gray-100 dark:bg-[#161522] border border-gray-200 dark:border-[#232234]">
-              <button
-                type="button"
-                onClick={() => {
-                  setTypeInput("Expense");
-                  if (!editingCategory) setColorInput("#FF6B6B");
-                }}
-                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  typeInput === "Expense"
-                    ? "bg-[#FF6B6B] text-white shadow-xs"
-                    : "text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white"
-                }`}
-              >
-                Expense
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setTypeInput("Income");
-                  if (!editingCategory) setColorInput("#10B981");
-                }}
-                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  typeInput === "Income"
-                    ? "bg-[#10B981] text-white shadow-xs"
-                    : "text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white"
-                }`}
-              >
-                Income
-              </button>
-            </div>
-          </div>
-
-          {/* Name Input */}
-          <div>
-            <label className="block text-[11px] font-bold text-gray-500 dark:text-slate-400 mb-1.5 uppercase tracking-wider">
-              Category Name
-            </label>
-            <input
-              type="text"
-              value={nameInput}
-              onChange={(e) => {
-                setNameInput(e.target.value);
-                if (formError) setFormError("");
-              }}
-              placeholder="e.g. Groceries, Freelance, Subscriptions..."
-              className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-semibold border transition-all ${
-                isDark
-                  ? "bg-[#161522] border-[#232234] text-white placeholder-slate-500 focus:border-[#8B5CF6]"
-                  : "bg-white border-gray-300 text-gray-900 placeholder-gray-400 focus:border-gray-500"
-              }`}
-              style={{ borderColor: formError ? "#EF4444" : undefined }}
-              autoFocus
-              required
-            />
-            {formError && (
-              <p className="text-[11px] text-rose-500 font-medium mt-1.5 flex items-center gap-1">
-                <HiExclamationTriangle className="w-3.5 h-3.5 shrink-0" />
-                <span>{formError}</span>
-              </p>
-            )}
-          </div>
-
-          {/* Color Swatches */}
-          <div>
-            <label className="block text-[11px] font-bold text-gray-500 dark:text-slate-400 mb-1.5 uppercase tracking-wider">
-              Color Tag
-            </label>
-            <div className="flex items-center gap-2 flex-wrap">
-              {PRESET_COLORS.map((color) => (
-                <button
-                  key={color}
-                  type="button"
-                  onClick={() => setColorInput(color)}
-                  className="w-7 h-7 rounded-full flex items-center justify-center transition-transform hover:scale-110 cursor-pointer shadow-2xs"
-                  style={{ backgroundColor: color }}
-                >
-                  {colorInput === color && (
-                    <HiCheck className="w-4 h-4 text-white stroke-2" />
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="pt-2 flex flex-col-reverse xs:flex-row items-stretch xs:items-center justify-end gap-2 sm:gap-2.5 border-t border-gray-100 dark:border-[#1f1e2b]">
             <button
               type="button"
-              onClick={handleCancel}
-              className={`w-full xs:w-auto px-4 py-2.5 rounded-xl text-xs font-semibold transition-colors text-center cursor-pointer ${
-                isDark
-                  ? "text-slate-300 bg-[#161522] hover:bg-[#1f1e2f]"
-                  : "text-gray-700 bg-gray-100 hover:bg-gray-200"
-              }`}
+              onClick={onClose}
+              aria-label="Close category modal"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-[var(--home-text-muted)] hover:bg-[var(--home-track)] cursor-pointer"
             >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full xs:w-auto inline-flex items-center justify-center gap-1.5 py-2.5 px-5 rounded-xl text-xs font-bold text-white shadow-xs hover:opacity-90 transition-all cursor-pointer disabled:opacity-50"
-              style={{
-                backgroundColor:
-                  typeInput === "Expense" ? "#FF6B6B" : "#10B981",
-              }}
-            >
-              {isSubmitting ? (
-                <>
-                  <HiArrowPath className="w-3.5 h-3.5 animate-spin" />
-                  <span>Saving...</span>
-                </>
-              ) : editingCategory ? (
-                <>
-                  <HiPencilSquare className="w-3.5 h-3.5" />
-                  <span>Update Category</span>
-                </>
-              ) : (
-                <>
-                  <HiPlus className="w-3.5 h-3.5 stroke-2" />
-                  <span>Save Category</span>
-                </>
-              )}
+              <HiXMark className="w-5 h-5" />
             </button>
           </div>
-        </form>
+
+          {formError && (
+            <div className="p-3 rounded-2xl border border-[var(--home-destructive)]/40 bg-[var(--home-background)] text-xs font-semibold text-[var(--home-destructive)]">
+              {formError}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Kind Toggle (locked while editing so linked transactions stay same-kind) */}
+            <div>
+              <span className="block text-xs font-semibold uppercase tracking-wider text-[var(--home-text-secondary)] mb-1.5">
+                Type
+              </span>
+              <div className="grid grid-cols-2 gap-1.5 p-1 rounded-[22px] bg-[var(--home-track)] border border-[var(--home-border)]">
+                {[
+                  { id: "expense", label: "Expense" },
+                  { id: "income", label: "Income" },
+                ].map((tab) => {
+                  const active = kindInput === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      disabled={isEditing}
+                      onClick={() => {
+                        setKindInput(tab.id);
+                        if (!isEditing) {
+                          setIconKey(tab.id === "income" ? "salary" : "other");
+                        }
+                      }}
+                      className={`py-2 rounded-[18px] text-xs font-bold transition-all cursor-pointer disabled:cursor-not-allowed ${
+                        active
+                          ? tab.id === "income"
+                            ? "bg-[var(--home-income)] text-white shadow-xs"
+                            : "bg-[var(--home-expense)] text-white shadow-xs"
+                          : "text-[var(--home-text-secondary)]"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Preview + Icon & Color Triggers */}
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setIconPickerOpen(true)}
+                className="flex items-center gap-3 p-3 rounded-2xl border border-[var(--home-border)] bg-[var(--home-background)] hover:border-[var(--home-accent)] transition-colors text-left cursor-pointer"
+              >
+                <CategoryIcon
+                  iconKey={iconKey}
+                  color={colorInput}
+                  size={20}
+                  withBadge
+                  badgeSize={38}
+                />
+                <div className="min-w-0">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--home-text-muted)] block">
+                    Icon
+                  </span>
+                  <span className="text-xs font-bold inline-flex items-center gap-1">
+                    <HiOutlineSquares2X2 className="w-3.5 h-3.5" />
+                    <span>Choose</span>
+                  </span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setColorPickerOpen(true)}
+                className="flex items-center gap-3 p-3 rounded-2xl border border-[var(--home-border)] bg-[var(--home-background)] hover:border-[var(--home-accent)] transition-colors text-left cursor-pointer"
+              >
+                <span
+                  className="w-9 h-9 rounded-full border border-black/15 shrink-0"
+                  style={{ backgroundColor: colorInput }}
+                />
+                <div className="min-w-0">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--home-text-muted)] block">
+                    Color
+                  </span>
+                  <span className="text-xs font-mono-num font-bold inline-flex items-center gap-1">
+                    <HiOutlineSwatch className="w-3.5 h-3.5" />
+                    <span>{colorInput}</span>
+                  </span>
+                </div>
+              </button>
+            </div>
+
+            <div>
+              <label
+                htmlFor="cat-name-input"
+                className="block text-xs font-semibold uppercase tracking-wider text-[var(--home-text-secondary)] mb-1"
+              >
+                Category Name
+              </label>
+              <input
+                id="cat-name-input"
+                type="text"
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                placeholder="e.g., Coffee, Freelance, Subscriptions"
+                required
+                className="w-full px-4 py-2.5 rounded-xl border border-[var(--home-border)] bg-[var(--home-background)] text-sm focus:outline-none focus:border-[var(--home-accent)]"
+              />
+            </div>
+
+            <div className="flex items-center gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 py-2.5 rounded-full border border-[var(--home-border)] bg-[var(--home-background)] text-xs font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="flex-[2] py-2.5 rounded-full bg-[var(--home-accent)] text-[var(--home-on-accent)] text-xs font-semibold cursor-pointer disabled:opacity-50"
+              >
+                {isSubmitting
+                  ? "Saving…"
+                  : isEditing
+                    ? "Save Category"
+                    : "Create Category"}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
+
+      <IconPickerModal
+        open={iconPickerOpen}
+        selectedIconKey={iconKey}
+        onSelect={setIconKey}
+        onClose={() => setIconPickerOpen(false)}
+        title="Choose Category Icon"
+      />
+
+      <ColorPickerModal
+        open={colorPickerOpen}
+        initialColor={colorInput}
+        onSelect={setColorInput}
+        onClose={() => setColorPickerOpen(false)}
+      />
+    </>
   );
 }

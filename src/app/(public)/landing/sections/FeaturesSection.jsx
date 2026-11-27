@@ -1,14 +1,12 @@
 "use client";
 
-import React from "react";
-import { useTheme } from "styled-components";
-import { useSelector } from "react-redux";
+import React, { useState } from "react";
 import {
   IoTrendingUp,
   IoDocumentText,
   IoWallet,
   IoLayers,
-  IoSync,
+  IoMic,
   IoLockClosed,
 } from "react-icons/io5";
 
@@ -16,57 +14,68 @@ const features = [
   {
     Icon: IoTrendingUp,
     title: "Track Income & Expenses",
-    desc: "Know where your money goes.",
+    desc: "Fast calculator-keypad entry with Budget Mode and instant balance feedback.",
   },
   {
     Icon: IoDocumentText,
-    title: "Detailed Reports",
-    desc: "Visualize your spending.",
+    title: "Visual Analytics & Exports",
+    desc: "Category ring charts, 12-month bars, and instant CSV/PDF reports.",
   },
   {
     Icon: IoWallet,
-    title: "Set Budgets",
-    desc: "Stay on track with your goals.",
+    title: "Named Spend Buckets",
+    desc: "Allocate funds for trips, projects, or sinking funds with drag-and-drop ordering.",
   },
   {
     Icon: IoLayers,
-    title: "Multiple Accounts",
-    desc: "Manage in one place.",
+    title: "Multi-Account & Transfers",
+    desc: "Track cash, bank, and card accounts separately with neutral account transfers.",
   },
   {
-    Icon: IoSync,
-    title: "Recurring Bills",
-    desc: "Never miss a payment.",
+    Icon: IoMic,
+    title: "On-Device Receipt OCR & Voice",
+    desc: "Parse receipts locally in your browser or dictate entries hands-free.",
   },
   {
     Icon: IoLockClosed,
-    title: "Data Security",
-    desc: "Your data is safe with us.",
+    title: "Private & App-Lock Ready",
+    desc: "Optional device PIN + WebAuthn passkey lock, with private Row-Level Security sync.",
   },
 ];
 
-import { theme as defaultTheme } from "@/utils/theme";
+const TOTAL_SAMPLE_EXPENSE = 12550;
+
+const PIE_SEGMENTS = [
+  { label: "Housing", pct: 38, amount: 4769, color: "var(--home-category-1)" },
+  {
+    label: "Dining Out",
+    pct: 18,
+    amount: 2259,
+    color: "var(--home-category-2)",
+  },
+  {
+    label: "Groceries",
+    pct: 15,
+    amount: 1883,
+    color: "var(--home-category-3)",
+  },
+  {
+    label: "Utilities",
+    pct: 12,
+    amount: 1506,
+    color: "var(--home-category-4)",
+  },
+  { label: "Other", pct: 17, amount: 2133, color: "var(--home-category-5)" },
+];
 
 export default function FeaturesSection() {
-  const themeContext = useTheme();
-  const reduxTheme = useSelector((state) => state?.themeSlice || state?.theme);
-  const currentTheme = themeContext?.colors ? themeContext : reduxTheme;
-  const primary = currentTheme?.colors?.primary || defaultTheme.colors.primary;
-  const isDark = currentTheme?.mode === "dark";
+  const [activeIdx, setActiveIdx] = useState(null);
 
-  const pieSegments = [
-    { label: "Food & Dining", pct: 38, color: primary },
-    { label: "Transport", pct: 18, color: "#2F80ED" },
-    { label: "Shopping", pct: 15, color: "#F2994A" },
-    { label: "Bills & Utilities", pct: 12, color: "#6FCF97" },
-    { label: "Others", pct: 17, color: "#9B51E0" },
-  ];
-
-  // Build pie chart arcs — using SVG circle dasharray trick (circumference = 100)
   let cumulativeOffset = 0;
-  const arcs = pieSegments.map((seg) => {
+  const arcs = PIE_SEGMENTS.map((seg, idx) => {
     const arc = {
       ...seg,
+      idx,
       dasharray: `${seg.pct} ${100 - seg.pct}`,
       offset: -cumulativeOffset,
     };
@@ -74,211 +83,160 @@ export default function FeaturesSection() {
     return arc;
   });
 
+  const activeSeg = activeIdx !== null ? PIE_SEGMENTS[activeIdx] : null;
+  const formatInr = (num) =>
+    `₹${Number(num).toLocaleString("en-IN", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    })}`;
+
   return (
     <section
       id="features"
-      className={`py-8 md:py-12 relative overflow-hidden transition-colors duration-200 ${
-        isDark ? "bg-[#0b0f19]" : "bg-white"
-      }`}
+      className="scroll-mt-20 py-16 md:py-22 bg-[var(--home-card)] border-t border-[var(--home-border)]"
     >
-      {/* Background blobs */}
-      <div
-        className="absolute -left-[100px] top-[10%] w-[400px] h-[400px] rounded-full opacity-15 pointer-events-none blur-3xl"
-        style={{ background: `${primary}30` }}
-      />
-      <div
-        className="absolute -left-[50px] bottom-[5%] w-[250px] h-[250px] rounded-full opacity-10 pointer-events-none blur-2xl"
-        style={{ background: `${primary}25` }}
-      />
-
-      <div className="w-full px-4 sm:px-[80px]">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-10 items-center">
-          {/* ===== LEFT — Pie Chart Card ===== */}
-          <div className="relative flex justify-center">
-            {/* Pink blob behind card */}
-            <div
-              className="absolute -left-8 -top-8 w-[320px] h-[380px] rounded-[60px] opacity-10 pointer-events-none rotate-[-8deg]"
-              style={{ backgroundColor: primary }}
-            />
-
-            <div
-              className={`relative z-10 rounded-3xl p-4 xs:p-6 sm:p-8 shadow-xl border max-w-[400px] w-full transition-colors duration-200 ${
-                isDark
-                  ? "bg-[#1e293b] border-slate-700"
-                  : "bg-white border-gray-100"
-              }`}
-            >
-              {/* Header */}
-              <div className="flex items-center justify-between mb-4 sm:mb-5">
+      <div className="w-full max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+          {/* LEFT — Interactive Donut Card */}
+          <div className="lg:col-span-5 flex justify-center">
+            <div className="rounded-[28px] p-6 sm:p-8 border border-[var(--home-border)] bg-[var(--home-background)] max-w-[430px] w-full shadow-2xs">
+              <div className="flex items-start justify-between gap-3 mb-5">
                 <div>
-                  <span
-                    className={`text-xs font-medium block mb-0.5 ${
-                      isDark ? "text-gray-400" : "text-gray-500"
-                    }`}
-                  >
-                    Total Expenses
+                  <span className="text-xs font-semibold text-[var(--home-text-muted)] block mb-0.5">
+                    {activeSeg ? activeSeg.label : "This Month Total Expense"}
                   </span>
-                  <p
-                    className={`text-2xl sm:text-[28px] font-bold tracking-tight ${
-                      isDark ? "text-white" : "text-gray-900"
-                    }`}
-                  >
-                    ₹12,550
+                  <p className="font-mono-num text-3xl font-bold text-[var(--home-text)]">
+                    {activeSeg
+                      ? formatInr(activeSeg.amount)
+                      : formatInr(TOTAL_SAMPLE_EXPENSE)}
                   </p>
                 </div>
+                <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-[var(--home-card)] border border-[var(--home-border)] text-[var(--home-accent)]">
+                  {activeSeg ? `${activeSeg.pct}% share` : "Interactive"}
+                </span>
               </div>
 
-              {/* Donut Chart + Legend */}
-              <div className="flex flex-col xs:flex-row items-center gap-4 sm:gap-8">
-                {/* Donut Chart */}
-                <div className="w-[120px] h-[120px] sm:w-[140px] sm:h-[140px] relative shrink-0">
+              <div className="flex flex-col xs:flex-row items-center gap-6">
+                <div className="w-[144px] h-[144px] relative shrink-0">
                   <svg
                     viewBox="0 0 36 36"
                     className="w-full h-full"
                     style={{ transform: "rotate(-90deg)" }}
                   >
-                    {arcs.map((arc, i) => (
-                      <circle
-                        key={i}
-                        cx="18"
-                        cy="18"
-                        r="15.9155"
-                        fill="none"
-                        stroke={arc.color}
-                        strokeWidth="4.5"
-                        strokeDasharray={arc.dasharray}
-                        strokeDashoffset={arc.offset}
-                        strokeLinecap="round"
-                        className="transition-all duration-500"
-                      />
-                    ))}
+                    {arcs.map((arc) => {
+                      const isDimmed =
+                        activeIdx !== null && activeIdx !== arc.idx;
+                      return (
+                        <circle
+                          key={arc.label}
+                          cx="18"
+                          cy="18"
+                          r="15.9155"
+                          fill="none"
+                          stroke={arc.color}
+                          strokeWidth={activeIdx === arc.idx ? "5.2" : "4.4"}
+                          strokeDasharray={arc.dasharray}
+                          strokeDashoffset={arc.offset}
+                          opacity={isDimmed ? 0.35 : 1}
+                          onMouseEnter={() => setActiveIdx(arc.idx)}
+                          onMouseLeave={() => setActiveIdx(null)}
+                          onClick={() =>
+                            setActiveIdx((cur) =>
+                              cur === arc.idx ? null : arc.idx,
+                            )
+                          }
+                          className="cursor-pointer transition-all duration-200"
+                        />
+                      );
+                    })}
                   </svg>
-                  {/* Center circle */}
-                  <div
-                    className={`absolute inset-0 flex items-center justify-center`}
-                  >
-                    <div
-                      className={`w-[60px] h-[60px] sm:w-[70px] sm:h-[70px] rounded-full ${
-                        isDark ? "bg-[#1e293b]" : "bg-white"
-                      }`}
-                    />
+                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center px-3">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--home-text-muted)] truncate max-w-[78px]">
+                      {activeSeg ? activeSeg.label : "Total"}
+                    </span>
+                    <span className="font-mono-num text-sm font-bold text-[var(--home-text)]">
+                      {activeSeg ? `${activeSeg.pct}%` : "100%"}
+                    </span>
                   </div>
                 </div>
 
-                {/* Legend */}
-                <div className="space-y-2.5 flex-1">
-                  {pieSegments.map((seg, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center justify-between text-[11px] sm:text-xs"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="w-2 h-2 rounded-full shrink-0"
-                          style={{ backgroundColor: seg.color }}
-                        />
-                        <span
-                          className={`${
-                            isDark ? "text-gray-300" : "text-gray-600"
-                          }`}
-                        >
-                          {seg.label}
-                        </span>
-                      </div>
-                      <span
-                        className={`font-semibold ${
-                          isDark ? "text-gray-200" : "text-gray-800"
+                <div className="space-y-1.5 flex-1 w-full">
+                  {PIE_SEGMENTS.map((seg, idx) => {
+                    const isFocused = activeIdx === idx;
+                    return (
+                      <button
+                        key={seg.label}
+                        type="button"
+                        onMouseEnter={() => setActiveIdx(idx)}
+                        onMouseLeave={() => setActiveIdx(null)}
+                        onClick={() =>
+                          setActiveIdx((cur) => (cur === idx ? null : idx))
+                        }
+                        className={`w-full flex items-center justify-between text-xs px-2.5 py-1.5 rounded-xl transition-colors cursor-pointer ${
+                          isFocused
+                            ? "bg-[var(--home-card)] border border-[var(--home-accent)]/50"
+                            : "border border-transparent hover:bg-[var(--home-card)]/70"
                         }`}
                       >
-                        {seg.pct}%
-                      </span>
-                    </div>
-                  ))}
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: seg.color }}
+                          />
+                          <span className="text-[var(--home-text-secondary)] font-medium">
+                            {seg.label}
+                          </span>
+                        </div>
+                        <span className="font-mono-num font-bold text-[var(--home-text)]">
+                          {seg.pct}%
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Smart Insights Card */}
-              <div
-                className={`mt-6 p-3.5 rounded-xl border ${
-                  isDark
-                    ? "bg-amber-900/20 border-amber-800/30"
-                    : "bg-amber-50 border-amber-100"
-                }`}
-              >
-                <h4
-                  className={`text-xs font-bold mb-1 flex items-center gap-1.5 ${
-                    isDark ? "text-amber-200" : "text-gray-800"
-                  }`}
-                >
-                  <span>💡</span> Smart Insights
+              <div className="mt-6 p-3.5 rounded-2xl border border-[var(--home-border)] bg-[var(--home-card)]">
+                <h4 className="text-xs font-bold mb-1 text-[var(--home-text)]">
+                  SpendScope Insight
                 </h4>
-                <p
-                  className={`text-[11px] leading-relaxed ${
-                    isDark ? "text-amber-100/70" : "text-gray-600"
-                  }`}
-                >
-                  You spent 38% more on food this month. Consider setting a food
-                  budget.
+                <p className="text-xs leading-relaxed text-[var(--home-text-secondary)]">
+                  Transfers between your own accounts stay neutral so your true
+                  spending and income remain accurate.
                 </p>
               </div>
             </div>
           </div>
 
-          {/* ===== RIGHT — Features Grid ===== */}
-          <div>
-            <span
-              className="text-[11px] sm:text-xs font-bold tracking-[0.15em] uppercase block mb-3"
-              style={{ color: primary }}
-            >
+          {/* RIGHT — Structured Bento Feature Cards */}
+          <div className="lg:col-span-7">
+            <span className="text-xs font-bold tracking-[0.14em] uppercase block mb-2.5 text-[var(--home-accent)]">
               POWERFUL FEATURES
             </span>
-            <h2
-              className={`text-3xl sm:text-4xl font-extrabold tracking-tight leading-snug mb-4 ${
-                isDark ? "text-white" : "text-[#1a1a2e]"
-              }`}
-            >
+            <h2 className="font-display text-3xl sm:text-4xl tracking-tight leading-snug mb-3 text-[var(--home-text)]">
               Everything You Need
               <br />
-              for Better Money Management
+              for Calm Money Clarity
             </h2>
-            <p
-              className={`text-sm sm:text-base leading-relaxed mb-6 max-w-md ${
-                isDark ? "text-gray-400" : "text-gray-500"
-              }`}
-            >
-              Get detailed insights, set budgets, track recurring bills and make
-              smarter financial decisions — all in one place.
+            <p className="text-sm sm:text-base leading-relaxed mb-7 max-w-lg text-[var(--home-text-secondary)]">
+              Designed for speed and quiet focus on desktop, tablet, and phone
+              screens alike.
             </p>
 
-            {/* 6 Features in 3×2 Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-              {features.map((feat, i) => (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              {features.map((feat) => (
                 <div
-                  key={i}
-                  className="flex items-start gap-3 group"
+                  key={feat.title}
+                  className="rounded-2xl border border-[var(--home-border)] bg-[var(--home-background)]/80 hover:border-[var(--home-accent)]/60 hover:-translate-y-0.5 transition-all duration-200 p-4 flex items-start gap-3.5"
                 >
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-200"
-                    style={{
-                      backgroundColor: `${primary}12`,
-                      color: primary,
-                    }}
-                  >
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-[var(--home-card)] border border-[var(--home-border)] text-[var(--home-accent)]">
                     <feat.Icon className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3
-                      className={`text-sm font-bold mb-0.5 ${
-                        isDark ? "text-white" : "text-gray-800"
-                      }`}
-                    >
+                    <h3 className="text-sm font-bold mb-1 text-[var(--home-text)]">
                       {feat.title}
                     </h3>
-                    <p
-                      className={`text-xs leading-relaxed ${
-                        isDark ? "text-gray-400" : "text-gray-500"
-                      }`}
-                    >
+                    <p className="text-xs leading-relaxed text-[var(--home-text-secondary)]">
                       {feat.desc}
                     </p>
                   </div>

@@ -1,60 +1,63 @@
 import { createSlice } from "@reduxjs/toolkit";
-import { theme as lightTheme, darkTheme } from "../../utils/theme.js";
-import { emptyStore } from "../actions.js";
+import { buildTheme } from "../../utils/theme.js";
+
+const initialTheme = buildTheme("light", null);
 
 const initialState = {
-  mode: "light",
-  colors: {
-    ...lightTheme.colors,
-  },
+  mode: initialTheme.mode,
+  customAccent: null,
+  tokens: initialTheme.tokens,
+  colors: initialTheme.colors,
 };
 
 const themeSlice = createSlice({
   name: "theme-color",
-  initialState: initialState,
+  initialState,
   reducers: {
     changePrimaryColor: (state, action) => {
-      const color = action?.payload;
-      if (!state.colors) {
-        state.colors = { ...lightTheme.colors };
-      }
-      state.colors.primary = color;
-      if (state.mode === "light") {
-        state.colors.sidebarBg = color;
-      }
+      const nextAccent = action?.payload || null;
+      const built = buildTheme(state.mode || "light", nextAccent);
+      state.customAccent = built.customAccent;
+      state.tokens = built.tokens;
+      state.colors = built.colors;
     },
     changeTheme: (state, action) => {
       const nextMode =
-        action.payload || (state.mode === "light" ? "dark" : "light");
-      state.mode = nextMode;
-      const targetColors =
-        nextMode === "dark" ? darkTheme.colors : lightTheme.colors;
-
-      // Preserve current primary color
-      const currentPrimary = state.colors?.primary || targetColors.primary;
-
-      state.colors = {
-        ...targetColors,
-        primary: currentPrimary,
-      };
-
-      // Resolve sidebarBg
-      if (nextMode === "light") {
-        state.colors.sidebarBg = currentPrimary;
-      }
+        action?.payload === "dark" || action?.payload === "light"
+          ? action.payload
+          : state.mode === "light"
+            ? "dark"
+            : "light";
+      const built = buildTheme(nextMode, state.customAccent || null);
+      state.mode = built.mode;
+      state.tokens = built.tokens;
+      state.colors = built.colors;
+    },
+    resetThemeAccent: (state) => {
+      const built = buildTheme(state.mode || "light", null);
+      state.customAccent = null;
+      state.tokens = built.tokens;
+      state.colors = built.colors;
+    },
+    applyPreferencesTheme: (state, action) => {
+      const mode = action?.payload?.appearance_mode || state.mode || "light";
+      const accent =
+        action?.payload?.accent_color !== undefined
+          ? action.payload.accent_color
+          : state.customAccent;
+      const built = buildTheme(mode, accent);
+      state.mode = built.mode;
+      state.customAccent = built.customAccent;
+      state.tokens = built.tokens;
+      state.colors = built.colors;
     },
   },
-  // extraReducers(builder) {
-  //   if (emptyStore) {
-  //     builder.addCase(emptyStore, () => {
-  //       return {
-  //         mode: "light",
-  //         colors: { ...lightTheme.colors },
-  //       };
-  //     });
-  //   }
-  // },
 });
 
-export const { changePrimaryColor, changeTheme } = themeSlice.actions;
+export const {
+  changePrimaryColor,
+  changeTheme,
+  resetThemeAccent,
+  applyPreferencesTheme,
+} = themeSlice.actions;
 export default themeSlice.reducer;

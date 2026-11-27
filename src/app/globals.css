@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
-
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
@@ -7,97 +5,105 @@
 @config "../../tailwind.config.mjs";
 
 :root {
-  --font-primary: "Poppins", sans-serif;
-  --font-poppins: "Poppins", sans-serif;
-  --primary: #EB5757;
-  --background: #f9fafb;
-  --foreground: #111827;
-}
+  --font-display: "Caprasimo", Georgia, serif;
+  --font-sans: "Figtree", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
+  --home-background: #F5EDDE;
+  --home-card: #FBF7EF;
+  --home-border: #E1DACD;
+  --home-track: #E5DECE;
+  --home-accent: #C88856;
+  --home-on-accent: #FFFDFA;
+  --home-income: #6C7555;
+  --home-income-soft: #EEF3DF;
+  --home-expense: #966031;
+  --home-text: #2B2827;
+  --home-text-secondary: #68635D;
+  --home-text-muted: #938C7F;
+  --home-destructive: #FB4A49;
+  --add-sheet-bg: #FFFDF9;
+  --add-key-bg: #F5F1EA;
+  --add-operator-key-bg: #FBEEE7;
+  --home-category-1: #A3AE8B;
+  --home-category-2: #D59665;
+  --home-category-3: #966031;
+  --home-category-4: #6C7555;
+  --home-category-5: #C8B28E;
+  --home-category-6: #7E6A55;
 
-/* @import url('https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&family=Nunito:ital,wght@0,200..1000;1,200..1000&family=Oswald:wght@200..700&family=Outfit:wght@100..900&family=Playwrite+BE+WAL+Guides&family=Playwrite+CU+Guides&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
-@import "tailwindcss";
-
-@custom-variant dark (&:where(.dark, .dark *));
-
-@config "../../tailwind.config.mjs";
-
-:root {
-  --font-primary: "Playwrite CU Guides", cursive;
-  --font-poppins: "Playwrite CU Guides", cursive;
-  --primary: #EB5757;
-  --background: #f9fafb;
-  --foreground: #111827;
-} */
-@theme {
-  --font-sans: var(--font-primary);
-  --font-poppins: var(--font-poppins);
-  --radius-xs: 8px;
-  --radius-sm: 8px;
-  --radius-md: 8px;
-  --radius-lg: 8px;
-  --radius-xl: 8px;
-  --radius-2xl: 8px;
-  --radius-3xl: 8px;
-  --radius-4xl: 8px;
-  --radius: 8px;
+  --primary: var(--home-accent);
+  --background: var(--home-background);
+  --foreground: var(--home-text);
 }
 
 html.dark {
-  --background: #08070B;
-  --foreground: #f8fafc;
+  --home-background: #1A1714;
+  --home-card: #24201C;
+  --home-border: #3A342D;
+  --home-track: #332D27;
+  --home-accent: #D99A6C;
+  --home-on-accent: #FFFDFA;
+  --home-income: #A3AE8B;
+  --home-income-soft: #2A2E22;
+  --home-expense: #D08A55;
+  --home-text: #F2EADB;
+  --home-text-secondary: #C2B9AB;
+  --home-text-muted: #9A9286;
+  --home-destructive: #FF8A86;
+  --add-sheet-bg: #221E1A;
+  --add-key-bg: #2E2924;
+  --add-operator-key-bg: #3A2B23;
+  --home-category-1: #A3AE8B;
+  --home-category-2: #D59665;
+  --home-category-3: #B97A48;
+  --home-category-4: #8C977A;
+  --home-category-5: #C8B28E;
+  --home-category-6: #A08A73;
+
+  --primary: var(--home-accent);
+  --background: var(--home-background);
+  --foreground: var(--home-text);
   color-scheme: dark;
 }
 
-/* Global 8px border-radius standard */
-[class*="rounded-"]:not([class*="rounded-full"]):not([class*="rounded-none"]),
-.rounded,
-button,
-input,
-select,
-textarea,
-.ant-btn,
-.ant-select,
-.ant-select-selector,
-.ant-select-selection-item,
-.ant-select-item,
-.ant-picker,
-.ant-modal-content,
-.ant-card,
-.ant-input,
-.ant-segmented,
-.ant-dropdown,
-.ant-select-dropdown,
-.ant-picker-dropdown,
-.ant-picker-panel-container {
-  border-radius: 8px !important;
-}
-
-*,
-*::before,
-*::after {
-  font-family: var(--font-primary) !important;
+@theme {
+  --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
 }
 
 html {
-  font-size: 90%; /* Increased 10% overall for clear, comfortable readability */
-}
-
-html,
-* {
-  font-family: var(--font-primary) !important;
+  font-size: 16px;
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: var(--font-primary) !important;
-  line-height: 1.45;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  line-height: 1.5;
   overflow-x: hidden;
-  max-width: 100vw; 
+  max-width: 100vw;
   width: 100%;
   position: relative;
   transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.font-display {
+  font-family: var(--font-display), Georgia, serif;
+}
+
+.font-sans {
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+.font-mono-num {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }
 
 img,
@@ -122,58 +128,171 @@ span {
   overflow-wrap: break-word;
 }
 
-button,
-input,
-optgroup,
-select,
-textarea {
-  font-family: var(--font-primary) !important;
-  max-width: 100%;
-}
-
-.font-poppins {
-  font-family: var(--font-poppins) !important;
-}
-
-/* Hide scrollbars globally while maintaining scroll functionality */
-*::-webkit-scrollbar {
-  display: none;
-}
-
-* {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
-}
-
-/* Responsive typography and spacing hierarchy - ONLY for mobile/tablet, keeping desktop untouched */
-@media (max-width: 1024px) {
-  html {
-    font-size: 90%;
+/* ---------- Brand loader & 404 animations ---------- */
+@keyframes ss-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
-@media (max-width: 768px) {
-  html {
-    font-size: 98%; /* Increased 10%+ only on mobile: scales up all rem fonts and spacing overall */
+@keyframes ss-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(var(--ss-rot, 0deg));
   }
-  body {
-    line-height: 1.55;
-  }
-}
-
-@media (max-width: 480px) {
-  html {
-    font-size: 96%; /* Increased 10%+ on mobile phones so text & spacing are clear and comfortable */
+  50% {
+    transform: translateY(-10px) rotate(var(--ss-rot, 0deg));
   }
 }
 
-@media (max-width: 360px) {
-  html {
-    font-size: 92%; /* Increased 10%+ on compact phone screens */
+@keyframes ss-pulse-ring {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
   }
 }
 
-/* Mobile Friendly Ant Design DateRange & Picker Overrides */
+@keyframes ss-coin-bounce {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0) scale(0.85);
+    opacity: 0.5;
+  }
+  40% {
+    transform: translateY(-9px) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes ss-progress {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(260%);
+  }
+}
+
+@keyframes ss-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ss-spin {
+  animation: ss-spin 1.6s linear infinite;
+}
+.ss-float {
+  animation: ss-float 4.5s ease-in-out infinite;
+}
+.ss-pulse-ring {
+  animation: ss-pulse-ring 2s ease-out infinite;
+}
+.ss-coin {
+  animation: ss-coin-bounce 1.2s ease-in-out infinite;
+}
+.ss-progress {
+  animation: ss-progress 1.5s ease-in-out infinite;
+}
+.ss-fade-up {
+  animation: ss-fade-up 0.6s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-spin,
+  .ss-float,
+  .ss-pulse-ring,
+  .ss-coin,
+  .ss-progress,
+  .ss-fade-up {
+    animation: none;
+  }
+}
+
+/* Custom subtle scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(147, 140, 127, 0.35);
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(147, 140, 127, 0.6);
+}
+
+/* Ant Design Theme Harmonization */
+.ant-select-selector,
+.ant-picker {
+  background-color: var(--home-card) !important;
+  border-color: var(--home-border) !important;
+  color: var(--home-text) !important;
+  font-family: var(--font-sans), system-ui, sans-serif !important;
+}
+
+.ant-select-selection-item,
+.ant-picker-input > input {
+  color: var(--home-text) !important;
+}
+
+.ant-select-arrow,
+.ant-picker-suffix {
+  color: var(--home-text-muted) !important;
+}
+
+.ant-select-dropdown,
+.ant-picker-dropdown,
+.ant-picker-panel-container {
+  background-color: var(--home-card) !important;
+  border: 1px solid var(--home-border) !important;
+  color: var(--home-text) !important;
+}
+
+.ant-select-item {
+  color: var(--home-text-secondary) !important;
+}
+
+.ant-select-item-option-selected {
+  background-color: var(--home-track) !important;
+  color: var(--home-text) !important;
+  font-weight: 600 !important;
+}
+
+.ant-select-item-option-active {
+  background-color: var(--home-background) !important;
+}
+
+.ant-picker-content th,
+.ant-picker-header button,
+.ant-picker-header-view {
+  color: var(--home-text-secondary) !important;
+}
+
+.ant-picker-cell {
+  color: var(--home-text-muted) !important;
+}
+
+.ant-picker-cell-in-view {
+  color: var(--home-text) !important;
+}
+
 @media (max-width: 640px) {
   .ant-picker-dropdown {
     max-width: 96vw !important;
@@ -194,271 +313,4 @@ textarea {
     max-width: 94vw !important;
     margin: 10px auto !important;
   }
-
-  /* Mobile responsive typography and spacing adjustments (+10%) */
-  .text-xs {
-    font-size: 0.85rem !important;
-    line-height: 1.35rem !important;
-  }
-  .ant-btn {
-    font-size: 14.5px !important;
-    padding: 7px 15px !important;
-  }
-  .ant-input {
-    font-size: 15px !important;
-    padding: 8px 14px !important;
-  }
-  .ant-select-custom .ant-select-selector {
-    font-size: 14.5px !important;
-    height: 38px !important;
-  }
-}
-
-/* Ant Design Dark Mode Overrides */
-html.dark .ant-select-selector,
-html.dark .ant-picker {
-  background-color: #161522 !important;
-  border-color: #232234 !important;
-  color: #f8fafc !important;
-}
-
-html.dark .ant-select-selection-item,
-html.dark .ant-picker-input > input {
-  color: #f8fafc !important;
-}
-
-html.dark .ant-select-arrow,
-html.dark .ant-picker-suffix {
-  color: #94a3b8 !important;
-}
-
-html.dark .ant-select-dropdown,
-html.dark .ant-picker-dropdown {
-  background-color: #121118 !important;
-  border: 1px solid #232234 !important;
-  font-size: 13.5px !important;
-}
-
-html.dark .ant-select-item {
-  color: #cbd5e1 !important;
-  font-size: 13.5px !important;
-}
-
-html.dark .ant-select-item-option-selected {
-  background-color: #1e1d2a !important;
-  color: #ffffff !important;
-}
-
-html.dark .ant-select-item-option-active {
-  background-color: #1a1926 !important;
-}
-
-html.dark .ant-picker-panel-container {
-  background-color: #121118 !important;
-}
-
-html.dark .ant-picker-content th,
-html.dark .ant-picker-header button,
-html.dark .ant-picker-header-view {
-  color: #cbd5e1 !important;
-  font-size: 13.5px !important;
-}
-
-html.dark .ant-picker-cell {
-  color: #64748b !important;
-  font-size: 13.5px !important;
-}
-
-html.dark .ant-picker-cell-in-view {
-  color: #f8fafc !important;
-}
-
-/* Custom Ant Design Controls Height & Vertical Alignment */
-.ant-select-custom {
-  height: 34px !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  vertical-align: middle !important;
-}
-
-.ant-select-custom.w-full {
-  width: 100% !important;
-}
-
-.ant-select-custom.w-full .ant-select-selector {
-  width: 100% !important;
-}
-
-.ant-select-custom .ant-select-selector {
-  height: 34px !important;
-  min-height: 34px !important;
-  max-height: 34px !important;
-  display: flex !important;
-  align-items: center !important;
-  border-radius: 8px !important;
-  font-weight: 700 !important;
-  font-size: 13.5px !important;
-  padding: 0 10px !important;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
-  box-sizing: border-box !important;
-}
-
-.ant-select-custom .ant-select-selection-item {
-  display: flex !important;
-  align-items: center !important;
-  font-weight: 700 !important;
-  line-height: 1 !important;
-}
-
-.ant-select-custom .ant-select-arrow {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  top: 50% !important;
-  transform: translateY(-50%) !important;
-  margin-top: 0 !important;
-}
-
-.ant-rangepicker-custom {
-  height: 34px !important;
-  min-height: 34px !important;
-  max-height: 34px !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  border-radius: 8px !important;
-  font-weight: 600 !important;
-  font-size: 13.5px !important;
-  padding: 0 10px !important;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
-  box-sizing: border-box !important;
-}
-
-.ant-rangepicker-custom.w-full {
-  width: 100% !important;
-}
-
-/* Ant Design Component Spacing */
-.ant-btn {
-  font-size: 13.5px !important;
-  height: auto !important;
-  padding: 6px 14px !important;
-  line-height: 1.45 !important;
-}
-
-.ant-btn-sm {
-  font-size: 12px !important;
-  padding: 4px 10px !important;
-}
-
-.ant-btn-lg {
-  font-size: 15px !important;
-  padding: 8px 20px !important;
-}
-
-.ant-input {
-  font-size: 13.5px !important;
-  padding: 7px 12px !important;
-}
-
-.ant-modal-content {
-  padding: 16px !important;
-}
-
-.ant-card .ant-card-body {
-  padding: 16px !important;
-}
-
-/* Ant Design Form Select Styling (Currency & Dropdowns) */
-.ant-select-currency {
-  width: 100% !important;
-  height: 42px !important;
-}
-
-.ant-select-currency .ant-select-selector {
-  height: 42px !important;
-  display: flex !important;
-  align-items: center !important;
-  border-radius: 8px !important;
-  font-size: 14.5px !important;
-  font-weight: 600 !important;
-  padding: 0 12px !important;
-  transition: all 0.2s ease !important;
-}
-
-html.dark .ant-select-currency .ant-select-selector {
-  background-color: #161522 !important;
-  border-color: #232234 !important;
-  color: #f8fafc !important;
-}
-
-html:not(.dark) .ant-select-currency .ant-select-selector {
-  background-color: #ffffff !important;
-  border-color: #d1d5db !important;
-  color: #111827 !important;
-}
-
-.ant-select-currency:hover .ant-select-selector {
-  border-color: var(--primary, #eb5757) !important;
-}
-
-.ant-select-currency.ant-select-focused .ant-select-selector {
-  border-color: var(--primary, #eb5757) !important;
-  box-shadow: 0 0 0 2px rgba(235, 87, 87, 0.2) !important;
-}
-
-.currency-option-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  width: 100%;
-  padding: 2px 0;
-}
-
-.currency-select-dropdown {
-  border-radius: 8px !important;
-  padding: 6px !important;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
-}
-
-html.dark .currency-select-dropdown {
-  background-color: #121118 !important;
-  border: 1px solid #232234 !important;
-}
-
-html:not(.dark) .currency-select-dropdown {
-  background-color: #ffffff !important;
-  border: 1px solid #e5e7eb !important;
-}
-
-.currency-select-dropdown .ant-select-item {
-  border-radius: 8px !important;
-  padding: 8px 12px !important;
-  margin-bottom: 2px !important;
-  transition: all 0.15s ease !important;
-}
-
-html.dark .currency-select-dropdown .ant-select-item-option-selected {
-  background-color: #1f1e2f !important;
-}
-
-html.dark .currency-select-dropdown .ant-select-item-option-active {
-  background-color: #181724 !important;
-}
-
-.custom-scrollbar::-webkit-scrollbar {
-  width: 5px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(156, 163, 175, 0.4);
-  border-radius: 9999px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(156, 163, 175, 0.7);
 }

@@ -1,35 +1,56 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useSelector } from "react-redux";
 import {
   getTransactions as fetchTransactionsApi,
   createTransaction as createTransactionApi,
+  updateTransaction as updateTransactionApi,
   deleteTransaction as deleteTransactionApi,
 } from "@/services/transactionsService";
+import { subscribeDataChanged } from "@/lib/localDb";
 
-export const useTransactions = () => {
+export const useTransactions = (options = {}) => {
+  const userId = useSelector((state) => state?.authSlice?.userId) || null;
+  const storeActiveAccountId =
+    useSelector((state) => state?.appSlice?.activeAccountId) || null;
+
+  const accountId =
+    options.accountId !== undefined ? options.accountId : storeActiveAccountId;
+
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  /**
-   * Fetch all transactions
-   */
   const getTransactions = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchTransactionsApi();
+      const data = await fetchTransactionsApi({
+        userId,
+        accountId,
+      });
       setTransactions(data || []);
     } catch (err) {
       setError(err?.message || "Failed to load transactions.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userId, accountId]);
 
   useEffect(() => {
     getTransactions();
+
+    const unsubData = subscribeDataChanged((detail) => {
+      if (
+        !detail?.storeName ||
+        detail.storeName === "transactions" ||
+        detail.storeName === "categories" ||
+        detail.storeName === "accounts"
+      ) {
+        getTransactions();
+      }
+    });
 
     const handleResetEvent = () => {
       setTransactions([]);
@@ -40,22 +61,25 @@ export const useTransactions = () => {
       window.addEventListener("spendscope:transactions-reset", handleResetEvent);
     }
     return () => {
+      unsubData();
       if (typeof window !== "undefined") {
-        window.removeEventListener("spendscope:transactions-reset", handleResetEvent);
+        window.removeEventListener(
+          "spendscope:transactions-reset",
+          handleResetEvent,
+        );
       }
     };
   }, [getTransactions]);
 
-  /**
-   * Add a new transaction
-   */
   const addTransaction = async (payload) => {
     setError(null);
     try {
-      const newTx = await createTransactionApi(payload);
-      if (newTx) {
-        setTransactions((prev) => [newTx, ...prev]);
-      }
+      const newTx = await createTransactionApi({
+        ...payload,
+        userId,
+        account_id: payload?.account_id || accountId,
+      });
+      await getTransactions();
       return { success: true, data: newTx };
     } catch (err) {
       const errMsg = err?.message || "Failed to add transaction.";
@@ -64,14 +88,24 @@ export const useTransactions = () => {
     }
   };
 
-  /**
-   * Delete a transaction
-   */
+  const editTransaction = async (id, payload) => {
+    setError(null);
+    try {
+      const updated = await updateTransactionApi(id, payload, userId);
+      await getTransactions();
+      return { success: true, data: updated };
+    } catch (err) {
+      const errMsg = err?.message || "Failed to update transaction.";
+      setError(errMsg);
+      return { success: false, error: errMsg };
+    }
+  };
+
   const removeTransaction = async (id) => {
     setError(null);
     try {
-      await deleteTransactionApi(id);
-      setTransactions((prev) => prev.filter((t) => t.id !== id));
+      await deleteTransactionApi(id, userId);
+      await getTransactions();
       return { success: true };
     } catch (err) {
       const errMsg = err?.message || "Failed to delete transaction.";
@@ -80,44 +114,47 @@ export const useTransactions = () => {
     }
   };
 
-  /**
-   * Calculate financial totals: Total Income, Total Expense, Net Balance
-   */
   const { totalIncome, totalExpense, balance } = useMemo(() => {
-    let income = 0;
-    let expense = 0;
+    let incomeMinor = 0;
+    let expenseMinor = 0;
 
     transactions.forEach((t) => {
-      const val = parseFloat(t.amount) || 0;
-      if (t.type === "Income") {
-        income += val;
+      if (t.transfer_group_id) return;
+      const minor = Math.round((parseFloat(t.amount) || 0) * 100);
+      const kind = String(t.kind || t.type || "expense").toLowerCase();
+      if (kind === "income") {
+        incomeMinor += minor;
       } else {
-        expense += val;
+        expenseMinor += minor;
       }
     });
 
     return {
-      totalIncome: income,
-      totalExpense: expense,
-      balance: income - expense,
+      totalIncome: incomeMinor / 100,
+      totalExpense: expenseMinor / 100,
+      balance: (incomeMinor - expenseMinor) / 100,
     };
   }, [transactions]);
 
-  /**
-   * Fetch paginated transactions on demand
-   */
-  const fetchPaginatedTransactions = useCallback(async (params) => {
-    try {
-      const result = await fetchTransactionsApi(params);
-      return {
-        data: result || [],
-        totalCount: result?.totalCount ?? (result || []).length,
-      };
-    } catch (err) {
-      console.error(err);
-      return { data: [], totalCount: 0 };
-    }
-  }, []);
+  const fetchPaginatedTransactions = useCallback(
+    async (params = {}) => {
+      try {
+        const result = await fetchTransactionsApi({
+          ...params,
+          userId,
+          accountId: params?.accountId !== undefined ? params.accountId : accountId,
+        });
+        return {
+          data: result || [],
+          totalCount: result?.totalCount ?? (result || []).length,
+        };
+      } catch (err) {
+        console.error(err);
+        return { data: [], totalCount: 0 };
+      }
+    },
+    [userId, accountId],
+  );
 
   return {
     transactions,
@@ -127,9 +164,10 @@ export const useTransactions = () => {
     totalExpense,
     balance,
     getTransactions,
-    fetchPaginatedTransactions,
     addTransaction,
+    updateTransaction: editTransaction,
     deleteTransaction: removeTransaction,
+    fetchPaginatedTransactions,
   };
 };
 

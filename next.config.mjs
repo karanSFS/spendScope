@@ -16,9 +16,6 @@ try {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  compiler: {
-    styledComponents: true,
-  },
   allowedDevOrigins: ["127.0.0.1", "192.168.1.4"],
   turbopack: {
     root: projectRoot,

@@ -1,31 +1,61 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useDispatch, useSelector } from "react-redux";
-import { HiXMark, HiEye, HiEyeSlash, HiExclamationTriangle } from "react-icons/hi2";
-import { useTheme } from "styled-components";
-import { signUp, getAuthErrorMessage } from "@/services/authService";
-import { logingAuth } from "@/redux/slices/authSlice";
-import { emptyStore } from "@/redux/actions";
+import {
+  HiXMark,
+  HiEye,
+  HiEyeSlash,
+  HiExclamationTriangle,
+  HiCheckCircle,
+} from "react-icons/hi2";
+import {
+  MIN_PASSWORD_LENGTH,
+  getAuthErrorMessage,
+} from "@/services/authService";
+import useAuth from "@/hooks/useAuth";
 import CurrencySelect from "@/components/CurrencySelect";
-import { theme as defaultTheme } from "@/utils/theme";
-import { DEFAULT_CURRENCY, getCurrencySymbol } from "@/utils/currencies";
+import { SpendScopeLogo } from "@/components/Header";
+import { DEFAULT_CURRENCY } from "@/utils/currencies";
+import AuthSplitShell from "@/components/shared/AuthSplitShell";
 
-export default function SignUpPage({ isModal = false, onClose, onSwitchToSignIn }) {
+function evaluatePasswordStrength(pw) {
+  const len = pw.length;
+  if (len === 0) return { score: 0, label: "", color: "var(--home-border)" };
+  let score = 1;
+  if (len >= MIN_PASSWORD_LENGTH) score = 2;
+  const hasMixed = /[a-z]/.test(pw) && /[A-Z]/.test(pw);
+  const hasDigitOrSymbol = /[0-9]/.test(pw) || /[^A-Za-z0-9]/.test(pw);
+  if (len >= MIN_PASSWORD_LENGTH && (hasMixed || hasDigitOrSymbol)) score = 3;
+  if (len >= 14 && hasMixed && hasDigitOrSymbol) score = 4;
+
+  if (len < MIN_PASSWORD_LENGTH) {
+    return {
+      score: 1,
+      label: `${MIN_PASSWORD_LENGTH - len} more char${MIN_PASSWORD_LENGTH - len === 1 ? "" : "s"} needed`,
+      color: "var(--home-destructive)",
+    };
+  }
+  if (score === 2) {
+    return { score: 2, label: "Meets 12-char minimum", color: "var(--home-accent)" };
+  }
+  if (score === 3) {
+    return { score: 3, label: "Good password", color: "var(--home-income)" };
+  }
+  return { score: 4, label: "Strong password", color: "var(--home-income)" };
+}
+
+export default function SignUpPage({
+  isModal = false,
+  onClose,
+  onSwitchToSignIn,
+}) {
   const router = useRouter();
-  const dispatch = useDispatch();
+  const { signUp, continueAsGuest, isAuthenticated, authReady } = useAuth();
 
-  // Theme-awareness
-  const themeContext = useTheme();
-  const reduxTheme = useSelector((state) => state?.themeSlice || state?.theme);
-  const currentTheme = themeContext?.colors ? themeContext : reduxTheme;
-  const primary = currentTheme?.colors?.primary || defaultTheme.colors.primary;
-  const isDark = currentTheme?.mode === "dark";
-
-  const [fullName, setFullName] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [currency, setCurrency] = useState(DEFAULT_CURRENCY.code);
@@ -35,27 +65,27 @@ export default function SignUpPage({ isModal = false, onClose, onSwitchToSignIn 
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState("");
+  const [infoMessage, setInfoMessage] = useState("");
+
+  const pwStrength = useMemo(
+    () => evaluatePasswordStrength(password),
+    [password],
+  );
 
   useEffect(() => {
-    if (!isModal) {
-      router.replace("/?modal=signup");
+    if (!isModal && authReady && isAuthenticated) {
+      router.replace("/dashboard");
     }
-  }, [isModal, router]);
+  }, [isModal, authReady, isAuthenticated, router]);
 
-  // Handle ESC key press and body scroll lock when used as modal
   useEffect(() => {
     if (!isModal || !onClose) return;
-
     const handleKeyDown = (e) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
+      if (e.key === "Escape") onClose();
     };
-
     document.addEventListener("keydown", handleKeyDown);
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = originalOverflow;
@@ -65,14 +95,17 @@ export default function SignUpPage({ isModal = false, onClose, onSwitchToSignIn 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFormError("");
+    setInfoMessage("");
 
-    if (!fullName || !email || !password || !confirmPassword) {
+    if (!displayName.trim() || !email.trim() || !password || !confirmPassword) {
       setFormError("Please fill in all required fields.");
       return;
     }
 
-    if (password.length < 6) {
-      setFormError("Password must be at least 6 characters.");
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      setFormError(
+        `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`,
+      );
       return;
     }
 
@@ -81,52 +114,23 @@ export default function SignUpPage({ isModal = false, onClose, onSwitchToSignIn 
       return;
     }
 
-    const currencySymbol = getCurrencySymbol(currency);
-
     setLoading(true);
     try {
       const data = await signUp({
-        email,
+        email: email.trim(),
         password,
-        fullName,
-        phone,
+        displayName: displayName.trim(),
+        phone: phone.trim() || null,
         currency,
-        currencySymbol,
       });
-      const user = data?.user;
-      const session = data?.session;
-      const profile = data?.profile;
 
-      if (session) {
-        dispatch(emptyStore());
-        dispatch(
-          logingAuth({
-            userData: {
-              ...user,
-              phone,
-              currency,
-              currency_symbol: currencySymbol,
-              profile: {
-                ...profile,
-                phone,
-                currency,
-                currency_symbol: currencySymbol,
-              },
-            },
-            token: session.access_token,
-            userId: user?.id,
-            role: profile?.role || "student",
-          }),
-        );
+      if (data?.session) {
         if (onClose) onClose();
         router.replace("/dashboard");
       } else {
-        if (onSwitchToSignIn) {
-          onSwitchToSignIn();
-        } else {
-          if (onClose) onClose();
-          router.replace("/sign-in");
-        }
+        setInfoMessage(
+          "Account created! Check your email to verify your address, then sign in.",
+        );
       }
     } catch (error) {
       setFormError(getAuthErrorMessage(error));
@@ -135,88 +139,85 @@ export default function SignUpPage({ isModal = false, onClose, onSwitchToSignIn 
     }
   };
 
-  // Theme-based styles
-  const cardBg = isDark ? "bg-[#121118]" : "bg-white";
-  const cardBorder = isDark ? "border-[#1f1e2b]" : "border-gray-200";
-  const headingColor = isDark ? "text-white" : "text-gray-900";
-  const subTextColor = isDark ? "text-gray-400" : "text-gray-500";
-  const labelColor = isDark ? "text-gray-300" : "text-gray-700";
-  const inputBg = isDark ? "bg-[#161522]" : "bg-white";
-  const inputBorder = isDark ? "border-[#232234]" : "border-gray-300";
-  const inputText = isDark ? "text-gray-100" : "text-gray-900";
-  const inputPlaceholder = isDark ? "placeholder-gray-500" : "placeholder-gray-400";
-  const inputFocus = isDark ? "focus:ring-slate-400 focus:border-slate-400" : "focus:ring-2 focus:border-transparent";
-  const footerText = isDark ? "text-gray-400" : "text-gray-600";
-  const closeHover = isDark ? "hover:text-white hover:bg-slate-700" : "hover:text-gray-700 hover:bg-gray-100";
-
   const cardContent = (
-    <div
-      className={`w-full max-w-md ${cardBg} border ${cardBorder} rounded-2xl shadow-xl p-6 sm:p-8 relative transition-colors duration-200`}
-    >
-      {/* Modal Close Button */}
+    <div className="w-full max-w-md rounded-[26px] border border-[var(--home-border)] bg-[var(--home-card)] text-[var(--home-text)] shadow-xl p-6 sm:p-8 relative overflow-hidden">
+      <div className="absolute top-0 left-0 right-0 h-1 bg-[var(--home-accent)]/80" />
+
       {isModal && onClose && (
         <button
           type="button"
           onClick={onClose}
-          className={`absolute top-4 right-4 p-2 text-gray-400 ${closeHover} rounded-full transition-colors cursor-pointer`}
+          className="absolute top-4 right-4 p-2 text-[var(--home-text-muted)] hover:text-[var(--home-text)] hover:bg-[var(--home-track)] rounded-full transition-colors cursor-pointer"
           aria-label="Close"
         >
           <HiXMark className="w-5 h-5" />
         </button>
       )}
 
-      <div className="text-center mb-6">
-        <h1 className={`text-2xl font-bold ${headingColor} tracking-tight`}>
-          SpendScope
+      <div className="text-center mb-5 space-y-2">
+        <div className="flex justify-center">
+          <SpendScopeLogo className="w-9 h-9" />
+        </div>
+        <h1 className="font-display text-2xl sm:text-[26px] tracking-tight text-[var(--home-text)]">
+          Create Cloud Account
         </h1>
-        <p className={`text-sm ${subTextColor} mt-1.5`}>
-          Create your account & profile details
+        <p className="text-sm text-[var(--home-text-secondary)]">
+          Back up your SpendScope workspace privately
         </p>
       </div>
 
-      {/* Error Alert Box in Modal UI */}
       {formError && (
         <div
           role="alert"
           aria-live="polite"
-          className="mb-4 p-3.5 rounded-xl flex items-start gap-2.5 text-xs sm:text-sm font-medium border bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900/60 shadow-xs transition-all duration-200"
+          className="mb-4 p-3.5 rounded-2xl flex items-start gap-2.5 text-xs sm:text-sm font-medium border border-[var(--home-destructive)]/40 bg-[var(--home-background)] text-[var(--home-destructive)]"
         >
-          <HiExclamationTriangle className="w-5 h-5 shrink-0 text-red-500 mt-0.5" />
+          <HiExclamationTriangle className="w-5 h-5 shrink-0 mt-0.5" />
           <div className="flex-1 leading-snug">{formError}</div>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Full Name */}
+      {infoMessage && (
+        <div
+          role="status"
+          className="mb-4 p-3.5 rounded-2xl flex items-start gap-2.5 text-xs sm:text-sm font-medium border border-[var(--home-income)]/40 bg-[var(--home-income-soft)] text-[var(--home-income)]"
+        >
+          <HiCheckCircle className="w-5 h-5 shrink-0 mt-0.5" />
+          <div className="flex-1 leading-snug">{infoMessage}</div>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-3.5">
         <div>
           <label
-            htmlFor="signup-fullname"
-            className={`block text-xs font-semibold uppercase tracking-wider ${labelColor} mb-1`}
+            htmlFor="signup-displayname"
+            className="block text-xs font-semibold uppercase tracking-wider text-[var(--home-text-secondary)] mb-1"
           >
-            Full Name <span className="text-red-500">*</span>
+            Display Name{" "}
+            <span className="text-[var(--home-destructive)]">*</span>
           </label>
           <input
-            id="signup-fullname"
+            id="signup-displayname"
             type="text"
-            value={fullName}
+            value={displayName}
             onChange={(e) => {
-              setFullName(e.target.value);
+              setDisplayName(e.target.value);
               if (formError) setFormError("");
             }}
             required
             autoComplete="name"
-            placeholder="John Doe"
-            className={`w-full px-4 py-2.5 rounded-lg border ${inputBorder} ${inputBg} ${inputText} text-sm ${inputPlaceholder} focus:outline-none ${inputFocus} transition-all`}
+            placeholder="Alex Morgan"
+            className="w-full px-4 py-2.5 rounded-xl border border-[var(--home-border)] bg-[var(--home-background)] text-[var(--home-text)] text-sm placeholder-[var(--home-text-muted)] focus:outline-none focus:border-[var(--home-accent)] focus:ring-2 focus:ring-[var(--home-accent)]/20 transition-all"
           />
         </div>
 
-        {/* Email Address */}
         <div>
           <label
             htmlFor="signup-email"
-            className={`block text-xs font-semibold uppercase tracking-wider ${labelColor} mb-1`}
+            className="block text-xs font-semibold uppercase tracking-wider text-[var(--home-text-secondary)] mb-1"
           >
-            Email Address <span className="text-red-500">*</span>
+            Email Address{" "}
+            <span className="text-[var(--home-destructive)]">*</span>
           </label>
           <input
             id="signup-email"
@@ -229,60 +230,57 @@ export default function SignUpPage({ isModal = false, onClose, onSwitchToSignIn 
             required
             autoComplete="email"
             placeholder="you@example.com"
-            className={`w-full px-4 py-2.5 rounded-lg border ${inputBorder} ${inputBg} ${inputText} text-sm ${inputPlaceholder} focus:outline-none ${inputFocus} transition-all`}
+            className="w-full px-4 py-2.5 rounded-xl border border-[var(--home-border)] bg-[var(--home-background)] text-[var(--home-text)] text-sm placeholder-[var(--home-text-muted)] focus:outline-none focus:border-[var(--home-accent)] focus:ring-2 focus:ring-[var(--home-accent)]/20 transition-all"
           />
         </div>
 
-        {/* Phone Number */}
-        <div>
-          <label
-            htmlFor="signup-phone"
-            className={`block text-xs font-semibold uppercase tracking-wider ${labelColor} mb-1`}
-          >
-            Phone Number <span className="text-xs font-normal text-gray-400">(Optional)</span>
-          </label>
-          <input
-            id="signup-phone"
-            type="tel"
-            value={phone}
-            onChange={(e) => {
-              setPhone(e.target.value);
-              if (formError) setFormError("");
-            }}
-            autoComplete="tel"
-            placeholder="+1 234 567 890"
-            className={`w-full px-4 py-2.5 rounded-lg border ${inputBorder} ${inputBg} ${inputText} text-sm ${inputPlaceholder} focus:outline-none ${inputFocus} transition-all`}
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label
+              htmlFor="signup-phone"
+              className="block text-xs font-semibold uppercase tracking-wider text-[var(--home-text-secondary)] mb-1"
+            >
+              Phone{" "}
+              <span className="text-[11px] font-normal text-[var(--home-text-muted)]">
+                (Optional)
+              </span>
+            </label>
+            <input
+              id="signup-phone"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              autoComplete="tel"
+              placeholder="+91 98765 43210"
+              className="w-full px-4 py-2.5 rounded-xl border border-[var(--home-border)] bg-[var(--home-background)] text-[var(--home-text)] text-sm placeholder-[var(--home-text-muted)] focus:outline-none focus:border-[var(--home-accent)] focus:ring-2 focus:ring-[var(--home-accent)]/20 transition-all"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="signup-currency"
+              className="block text-xs font-semibold uppercase tracking-wider text-[var(--home-text-secondary)] mb-1"
+            >
+              Default Currency
+            </label>
+            <CurrencySelect
+              id="signup-currency"
+              value={currency}
+              onChange={(val) => setCurrency(val)}
+              roundedClass="rounded-xl"
+            />
+          </div>
         </div>
 
-        {/* Currency Selection */}
-        <div>
-          <label
-            htmlFor="signup-currency"
-            className={`block text-xs font-semibold uppercase tracking-wider ${labelColor} mb-1`}
-          >
-            Currency Type <span className="text-red-500">*</span>
-          </label>
-          <CurrencySelect
-            id="signup-currency"
-            value={currency}
-            onChange={(val) => setCurrency(val)}
-            isDark={isDark}
-            primaryColor={primary}
-            roundedClass="rounded-lg"
-          />
-          <p className="text-[11px] text-gray-400 mt-1">
-            Default is Indian Rupees (₹). You can change this anytime in your profile.
-          </p>
-        </div>
-
-        {/* Password */}
         <div>
           <label
             htmlFor="signup-password"
-            className={`block text-xs font-semibold uppercase tracking-wider ${labelColor} mb-1`}
+            className="block text-xs font-semibold uppercase tracking-wider text-[var(--home-text-secondary)] mb-1"
           >
-            Password <span className="text-red-500">*</span>
+            Password{" "}
+            <span className="text-[11px] font-normal text-[var(--home-text-muted)]">
+              (Min {MIN_PASSWORD_LENGTH} characters)
+            </span>
           </label>
           <div className="relative">
             <input
@@ -294,14 +292,15 @@ export default function SignUpPage({ isModal = false, onClose, onSwitchToSignIn 
                 if (formError) setFormError("");
               }}
               required
+              minLength={MIN_PASSWORD_LENGTH}
               autoComplete="new-password"
-              placeholder="••••••••"
-              className={`w-full px-4 py-2.5 pr-10 rounded-lg border ${inputBorder} ${inputBg} ${inputText} text-sm ${inputPlaceholder} focus:outline-none ${inputFocus} transition-all`}
+              placeholder="At least 12 characters"
+              className="w-full px-4 py-2.5 pr-10 rounded-xl border border-[var(--home-border)] bg-[var(--home-background)] text-[var(--home-text)] text-sm placeholder-[var(--home-text-muted)] focus:outline-none focus:border-[var(--home-accent)] focus:ring-2 focus:ring-[var(--home-accent)]/20 transition-all"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className={`absolute right-3 top-1/2 -translate-y-1/2 ${subTextColor} hover:text-gray-700 dark:hover:text-gray-200 focus:outline-none cursor-pointer p-1 rounded-md transition-colors`}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--home-text-muted)] hover:text-[var(--home-text)] cursor-pointer p-1"
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? (
@@ -311,19 +310,49 @@ export default function SignUpPage({ isModal = false, onClose, onSwitchToSignIn 
               )}
             </button>
           </div>
+
+          {/* Live 12-Character Password Strength Meter */}
+          {password.length > 0 && (
+            <div className="mt-2 space-y-1">
+              <div className="grid grid-cols-4 gap-1.5">
+                {[1, 2, 3, 4].map((step) => (
+                  <div
+                    key={step}
+                    className="h-1.5 rounded-full transition-colors duration-200"
+                    style={{
+                      backgroundColor:
+                        pwStrength.score >= step
+                          ? pwStrength.color
+                          : "var(--home-track)",
+                    }}
+                  />
+                ))}
+              </div>
+              <div className="flex items-center justify-between text-[11px]">
+                <span
+                  className="font-semibold"
+                  style={{ color: pwStrength.color }}
+                >
+                  {pwStrength.label}
+                </span>
+                <span className="font-mono-num text-[var(--home-text-muted)]">
+                  {password.length}/{MIN_PASSWORD_LENGTH}+ chars
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Confirm Password */}
         <div>
           <label
-            htmlFor="confirmPassword"
-            className={`block text-xs font-semibold uppercase tracking-wider ${labelColor} mb-1`}
+            htmlFor="signup-confirm-password"
+            className="block text-xs font-semibold uppercase tracking-wider text-[var(--home-text-secondary)] mb-1"
           >
-            Confirm Password <span className="text-red-500">*</span>
+            Confirm Password
           </label>
           <div className="relative">
             <input
-              id="confirmPassword"
+              id="signup-confirm-password"
               type={showConfirmPassword ? "text" : "password"}
               value={confirmPassword}
               onChange={(e) => {
@@ -331,15 +360,20 @@ export default function SignUpPage({ isModal = false, onClose, onSwitchToSignIn 
                 if (formError) setFormError("");
               }}
               required
+              minLength={MIN_PASSWORD_LENGTH}
               autoComplete="new-password"
-              placeholder="••••••••"
-              className={`w-full px-4 py-2.5 pr-10 rounded-lg border ${inputBorder} ${inputBg} ${inputText} text-sm ${inputPlaceholder} focus:outline-none ${inputFocus} transition-all`}
+              placeholder="Repeat password"
+              className="w-full px-4 py-2.5 pr-10 rounded-xl border border-[var(--home-border)] bg-[var(--home-background)] text-[var(--home-text)] text-sm placeholder-[var(--home-text-muted)] focus:outline-none focus:border-[var(--home-accent)] focus:ring-2 focus:ring-[var(--home-accent)]/20 transition-all"
             />
             <button
               type="button"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className={`absolute right-3 top-1/2 -translate-y-1/2 ${subTextColor} hover:text-gray-700 dark:hover:text-gray-200 focus:outline-none cursor-pointer p-1 rounded-md transition-colors`}
-              aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--home-text-muted)] hover:text-[var(--home-text)] cursor-pointer p-1"
+              aria-label={
+                showConfirmPassword
+                  ? "Hide confirm password"
+                  : "Show confirm password"
+              }
             >
               {showConfirmPassword ? (
                 <HiEyeSlash className="w-5 h-5" />
@@ -353,35 +387,44 @@ export default function SignUpPage({ isModal = false, onClose, onSwitchToSignIn 
         <button
           type="submit"
           disabled={loading}
-          style={{ backgroundColor: primary }}
-          className="w-full mt-2 py-2.5 px-4 text-white font-semibold rounded-lg hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all disabled:opacity-50 cursor-pointer shadow-sm"
+          className="w-full py-3 px-4 rounded-full bg-[var(--home-accent)] text-[var(--home-on-accent)] text-sm font-semibold hover:opacity-95 transition-opacity disabled:opacity-50 cursor-pointer shadow-sm"
         >
-          {loading ? "Creating account..." : "Sign up"}
+          {loading ? "Creating account..." : "Create Account"}
         </button>
       </form>
 
-      <p className={`mt-5 text-center text-sm ${footerText}`}>
-        Already have an account?{" "}
-        {onSwitchToSignIn ? (
-          <button
-            type="button"
-            onClick={onSwitchToSignIn}
-            className="font-semibold hover:underline cursor-pointer transition-colors"
-            style={{ color: primary }}
-          >
-            Sign in
-          </button>
-        ) : (
-          <Link
-            href="/sign-in"
-            onClick={() => isModal && onClose && onClose()}
-            className="font-semibold hover:underline transition-colors"
-            style={{ color: primary }}
-          >
-            Sign in
-          </Link>
-        )}
-      </p>
+      <div className="mt-4 pt-4 border-t border-[var(--home-border)] space-y-3 text-center">
+        <button
+          type="button"
+          onClick={() => {
+            if (onClose) onClose();
+            continueAsGuest();
+          }}
+          className="w-full py-2.5 px-4 rounded-full border border-[var(--home-border)] bg-[var(--home-background)] text-xs font-semibold text-[var(--home-text)] hover:border-[var(--home-accent)] transition-colors cursor-pointer"
+        >
+          Continue as Guest (Local Only)
+        </button>
+
+        <p className="text-sm text-[var(--home-text-secondary)]">
+          Already have an account?{" "}
+          {onSwitchToSignIn ? (
+            <button
+              type="button"
+              onClick={onSwitchToSignIn}
+              className="font-semibold text-[var(--home-accent)] hover:underline cursor-pointer"
+            >
+              Sign in
+            </button>
+          ) : (
+            <Link
+              href="/sign-in"
+              className="font-semibold text-[var(--home-accent)] hover:underline"
+            >
+              Sign in
+            </Link>
+          )}
+        </p>
+      </div>
     </div>
   );
 
@@ -392,24 +435,27 @@ export default function SignUpPage({ isModal = false, onClose, onSwitchToSignIn 
         role="dialog"
         aria-modal="true"
         aria-label="Sign up modal"
-        className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto max-h-screen"
+        className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto"
         onClick={onClose}
       >
-        <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md my-auto">
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="w-full max-w-md my-auto"
+        >
           {cardContent}
         </div>
       </div>,
-      document.body
+      document.body,
     );
   }
 
   return (
-    <div
-      className={`min-h-screen w-full flex items-center justify-center p-4 transition-colors duration-200 ${
-        isDark ? "bg-[#0b0f19]" : "bg-gray-50"
-      }`}
+    <AuthSplitShell
+      eyebrow="PRIVATE CLOUD BACKUP"
+      headline="Create your encrypted SpendScope account."
+      subtitle="Keep your Guest Mode ledger synced privately across browsers and Android — with zero ads and full CSV/PDF export."
     >
       {cardContent}
-    </div>
+    </AuthSplitShell>
   );
 }

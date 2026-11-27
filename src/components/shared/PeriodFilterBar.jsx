@@ -104,7 +104,7 @@ export default function PeriodFilterBar({
       <div
         role="tablist"
         aria-label="Spending period"
-        className="inline-flex items-center p-1 rounded-[22px] bg-[var(--home-track)] border border-[var(--home-border)] overflow-x-auto max-w-full"
+        className="grid grid-flow-col auto-cols-fr w-full gap-0.5 p-1 rounded-2xl bg-[var(--home-track)] border border-[var(--home-border)] overflow-hidden sm:inline-flex sm:w-auto sm:max-w-full sm:items-center sm:gap-0 sm:rounded-[22px] sm:overflow-x-auto"
       >
         {modes.map((m) => {
           const active = period === m;
@@ -115,7 +115,7 @@ export default function PeriodFilterBar({
               aria-selected={active}
               type="button"
               onClick={() => onPeriodChange?.(m)}
-              className={`px-3.5 py-1.5 rounded-[18px] text-xs font-semibold transition-all cursor-pointer shrink-0 ${
+              className={`min-w-0 px-0.5 py-2 text-center whitespace-nowrap rounded-[13px] text-[11px] tracking-tight font-semibold transition-all cursor-pointer sm:shrink-0 sm:px-3.5 sm:py-1.5 sm:rounded-[18px] sm:text-xs sm:tracking-normal ${
                 active
                   ? "bg-[var(--home-card)] text-[var(--home-text)] shadow-xs"
                   : "text-[var(--home-text-secondary)] hover:text-[var(--home-text)]"
@@ -147,7 +147,7 @@ export default function PeriodFilterBar({
           />
         </div>
       ) : (
-        <div className="inline-flex items-center justify-between sm:justify-end gap-1.5 rounded-full border border-[var(--home-border)] bg-[var(--home-card)] px-2 py-1">
+        <div className="flex w-full items-center justify-between gap-1.5 rounded-full border border-[var(--home-border)] bg-[var(--home-card)] px-2 py-1 sm:inline-flex sm:w-auto sm:justify-end">
           <button
             type="button"
             aria-label="Previous period"
@@ -158,7 +158,7 @@ export default function PeriodFilterBar({
           >
             <HiChevronLeft className="w-4 h-4" />
           </button>
-          <span className="text-xs font-semibold px-2 text-[var(--home-text)] whitespace-nowrap">
+          <span className="flex-1 text-center text-xs font-semibold px-2 text-[var(--home-text)] whitespace-nowrap sm:flex-none">
             {label}
           </span>
           <button

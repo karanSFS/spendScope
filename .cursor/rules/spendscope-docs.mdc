@@ -1,0 +1,29 @@
+---
+description: SpendScope project context — read docs/ before changing code
+alwaysApply: true
+---
+
+# SpendScope
+
+Next.js 15 (App Router, JS/JSX) + React 19 + Redux Toolkit + Tailwind v4. Local-first (IndexedDB)
+with optional Supabase sync; web companion of the Android app in `../spend_scope_android`.
+
+**Before working on anything, read `docs/README.md`**, then the doc for the area you touch:
+`docs/ARCHITECTURE.md`, `docs/DATA_AND_SYNC.md`, `docs/FEATURES.md`, `docs/CALCULATORS.md`,
+`docs/DESIGN_SYSTEM.md`, `docs/SECURITY_AND_PRIVACY.md`, `docs/DEVELOPMENT.md`,
+`docs/HISTORY_AND_DECISIONS.md`.
+
+## Non-negotiable rules
+
+- Never modify `../spend_scope_android`. Never mutate the remote Supabase project without explicit approval.
+- Data flow: UI → hooks (`src/hooks`) → services (`src/services`) → `src/lib/localDb.js` (IndexedDB + sync outbox).
+  Components must not call Supabase or IndexedDB directly.
+- Shared Supabase tables must stay Android-compatible (see `docs/DATA_AND_SYNC.md`).
+- Money: aggregate in integer minor units (`Math.round(x*100)`); format with `formatMoney`. Zero-decimal: JPY/KRW/VND.
+- Account transfers are paired rows with `transfer_group_id` and must be excluded from income/expense totals.
+- Dates use `src/lib/dateUtils.js` (local midnight → UTC ISO).
+- App Lock/PIN data is device-local and never synced. Seed defaults only after a successful pull.
+- Use CSS variable tokens (`var(--home-*)`); theme changes go through Redux, not the `dark` class.
+- Add/adjust tests for calculation, sync or money changes. Definition of done: `npm run lint` (0 warnings),
+  `npm test`, `npm run build`, relevant Playwright spec.
+- Update the matching file in `docs/` whenever behavior, schema, routes or conventions change.

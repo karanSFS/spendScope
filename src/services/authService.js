@@ -11,11 +11,39 @@ const assertSupabase = () => {
   return supabase;
 };
 
+const normalizeCurrency = (value) => {
+  const code = String(value || "INR").trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(code) ? code : "INR";
+};
+
 /**
- * Create or update profile in public.profiles using v2 schema columns only.
+ * The shared Supabase database has no `profiles` table, so the user's profile
+ * lives in Supabase Auth `user_metadata` (display_name, phone, avatar_key,
+ * currency). The returned shape is unchanged for the rest of the app.
+ */
+export const profileFromUser = (user) => {
+  if (!user?.id) return null;
+  const meta = user.user_metadata || {};
+  return {
+    id: user.id,
+    display_name:
+      meta.display_name ||
+      meta.full_name ||
+      user.email?.split("@")?.[0] ||
+      "SpendScope User",
+    email: user.email || null,
+    phone: meta.phone || null,
+    avatar_key: meta.avatar_key || "user_pf",
+    default_currency: normalizeCurrency(meta.currency),
+    created_at: user.created_at || null,
+    updated_at: user.updated_at || null,
+  };
+};
+
+/**
+ * Save profile fields into Auth user_metadata (the shared DB has no profiles table).
  */
 export const createOrUpdateProfile = async ({
-  userId,
   displayName,
   fullName,
   email = null,
@@ -30,51 +58,33 @@ export const createOrUpdateProfile = async ({
   )
     .trim()
     .slice(0, 80);
-  const resolvedCurrency = String(defaultCurrency || currency || "INR")
-    .trim()
-    .toUpperCase();
 
-  const profilePayload = {
-    id: userId,
-    display_name: resolvedName || "SpendScope User",
-    email: email || null,
-    phone: phone ? String(phone).trim() : null,
-    avatar_key: avatarKey || "user_pf",
-    default_currency: /^[A-Z]{3}$/.test(resolvedCurrency)
-      ? resolvedCurrency
-      : "INR",
-    updated_at: new Date().toISOString(),
-  };
-
-  const { data, error } = await client
-    .from("profiles")
-    .upsert(profilePayload, { onConflict: "id" })
-    .select()
-    .single();
+  const { data, error } = await client.auth.updateUser({
+    data: {
+      display_name: resolvedName || "SpendScope User",
+      phone: phone ? String(phone).trim() : null,
+      avatar_key: avatarKey || "user_pf",
+      currency: normalizeCurrency(defaultCurrency || currency),
+    },
+  });
 
   if (error) {
     throw error;
   }
 
-  return data || profilePayload;
+  return profileFromUser(data?.user);
 };
 
 /**
- * Get profile record for a user from public.profiles
+ * Get the signed-in user's profile (from the cached auth session).
  */
 export const getProfile = async (userId) => {
   if (!userId || !isSupabaseConfigured || !supabase) return null;
   try {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .maybeSingle();
-
-    if (error) {
-      return null;
-    }
-    return data;
+    const { data, error } = await supabase.auth.getSession();
+    if (error) return null;
+    const user = data?.session?.user;
+    return user?.id === userId ? profileFromUser(user) : null;
   } catch {
     return null;
   }
@@ -82,7 +92,7 @@ export const getProfile = async (userId) => {
 
 /**
  * Sign up a new user (requires >= 12 char password matching Supabase Auth policy).
- * Server trigger handle_new_user() creates profiles + user_preferences automatically.
+ * Profile fields are stored in Auth user_metadata (no profiles table on the shared DB).
  */
 export const signUp = async ({
   email,
@@ -115,6 +125,7 @@ export const signUp = async ({
       data: {
         display_name: cleanName,
         phone: phone ? String(phone).trim() : null,
+        avatar_key: "user_pf",
         currency: cleanCurrency,
       },
     },
@@ -124,23 +135,7 @@ export const signUp = async ({
     throw error;
   }
 
-  let profile = null;
-  if (data?.session && data?.user?.id) {
-    profile = await getProfile(data.user.id);
-    if (!profile) {
-      try {
-        profile = await createOrUpdateProfile({
-          userId: data.user.id,
-          displayName: cleanName,
-          email: data.user.email || email,
-          phone,
-          defaultCurrency: cleanCurrency,
-        });
-      } catch {
-        // Ignore if email confirmation is required before profile RLS passes
-      }
-    }
-  }
+  const profile = profileFromUser(data?.user);
 
   return {
     ...data,
@@ -152,7 +147,6 @@ export const signUp = async ({
  * Update existing user profile and auth metadata
  */
 export const updateUserProfile = async ({
-  userId,
   displayName,
   fullName,
   email,
@@ -165,34 +159,25 @@ export const updateUserProfile = async ({
   const cleanName = String(displayName || fullName || "SpendScope User")
     .trim()
     .slice(0, 80);
-  const cleanCurrency = String(defaultCurrency || currency || "INR")
-    .trim()
-    .toUpperCase();
 
   const authUpdates = {
     data: {
       display_name: cleanName,
       phone: phone ? String(phone).trim() : null,
-      currency: cleanCurrency,
+      avatar_key: avatarKey || "user_pf",
+      currency: normalizeCurrency(defaultCurrency || currency),
     },
   };
   if (email) {
     authUpdates.email = String(email).trim();
   }
 
-  const { error: authErr } = await client.auth.updateUser(authUpdates);
-  if (authErr) {
-    throw authErr;
+  const { data, error } = await client.auth.updateUser(authUpdates);
+  if (error) {
+    throw error;
   }
 
-  return await createOrUpdateProfile({
-    userId,
-    displayName: cleanName,
-    email,
-    phone,
-    avatarKey,
-    defaultCurrency: cleanCurrency,
-  });
+  return profileFromUser(data?.user);
 };
 
 export const updateUserPassword = async (newPassword) => {
@@ -221,27 +206,7 @@ export const login = async ({ email, password }) => {
     throw error;
   }
 
-  let profile = null;
-  if (data?.user?.id) {
-    profile = await getProfile(data.user.id);
-    if (!profile) {
-      try {
-        profile = await createOrUpdateProfile({
-          userId: data.user.id,
-          displayName:
-            data.user.user_metadata?.display_name ||
-            data.user.user_metadata?.full_name ||
-            data.user.email?.split("@")?.[0] ||
-            "SpendScope User",
-          email: data.user.email,
-          phone: data.user.user_metadata?.phone || null,
-          defaultCurrency: data.user.user_metadata?.currency || "INR",
-        });
-      } catch {
-        // Non-fatal fallback
-      }
-    }
-  }
+  const profile = profileFromUser(data?.user);
 
   return {
     ...data,

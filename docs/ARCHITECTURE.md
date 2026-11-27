@@ -77,11 +77,11 @@ spendScope/
 │   ├── tesseract/                # self-hosted OCR worker, wasm cores, eng.traineddata.gz
 │   ├── robots.txt, sitemap.xml, google…html (Search Console verification)
 ├── supabase/
-│   ├── config.toml               # project_id, auth (min password 12), redirect URLs
-│   ├── migrations/202611260001_spendscope_v2_schema.sql   # the live v2 schema
-│   └── _archive_old_project/     # old project's migrations/schema (reference only)
+│   ├── config.toml               # project_id (shared mobile DB), auth (min password 12), redirect URLs
+│   ├── migrations/README.md      # intentionally no migrations: DB is owned by the mobile team
+│   └── _archive_old_project/     # old project's + old web v2 schema (reference only)
 ├── tests/
-│   ├── unit/*.test.js            # Vitest (12 files, 72 tests)
+│   ├── unit/*.test.js            # Vitest (13 files, 95 tests)
 │   └── e2e/phase{1..6}-*.spec.mjs# Playwright (6 specs × 3 viewports = 18)
 └── src/
     ├── middleware.js             # legacy-route redirects only (no auth gating — guest-first)

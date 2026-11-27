@@ -5,8 +5,7 @@ const authMocks = vi.hoisted(() => ({
   signInWithPassword: vi.fn(),
   signOut: vi.fn(),
   updateUser: vi.fn(),
-  upsert: vi.fn(),
-  maybeSingle: vi.fn(),
+  from: vi.fn(),
 }));
 
 vi.mock("@/lib/supabaseconfig", () => ({
@@ -18,21 +17,7 @@ vi.mock("@/lib/supabaseconfig", () => ({
       signOut: authMocks.signOut,
       updateUser: authMocks.updateUser,
     },
-    from: vi.fn(() => ({
-      upsert: vi.fn((payload) => {
-        authMocks.upsert(payload);
-        return {
-          select: () => ({
-            single: () => Promise.resolve({ data: payload, error: null }),
-          }),
-        };
-      }),
-      select: () => ({
-        eq: () => ({
-          maybeSingle: authMocks.maybeSingle,
-        }),
-      }),
-    })),
+    from: authMocks.from,
   },
 }));
 
@@ -40,6 +25,7 @@ import {
   MIN_PASSWORD_LENGTH,
   signUp,
   createOrUpdateProfile,
+  profileFromUser,
   getAuthErrorMessage,
 } from "@/services/authService";
 
@@ -60,9 +46,24 @@ describe("authService v2 policy & profile schema", () => {
     expect(authMocks.signUp).not.toHaveBeenCalled();
   });
 
-  it("writes only v2 public.profiles columns (never legacy role/full_name/currency)", async () => {
-    await createOrUpdateProfile({
-      userId: "user-123",
+  it("stores profile fields in Auth user_metadata (shared DB has no profiles table)", async () => {
+    authMocks.updateUser.mockResolvedValue({
+      data: {
+        user: {
+          id: "user-123",
+          email: "alex@example.com",
+          user_metadata: {
+            display_name: "Alex Morgan",
+            phone: "+91 9999999999",
+            avatar_key: "user_pf2",
+            currency: "USD",
+          },
+        },
+      },
+      error: null,
+    });
+
+    const profile = await createOrUpdateProfile({
       displayName: "Alex Morgan",
       email: "alex@example.com",
       phone: "+91 9999999999",
@@ -70,9 +71,18 @@ describe("authService v2 policy & profile schema", () => {
       defaultCurrency: "usd",
     });
 
-    expect(authMocks.upsert).toHaveBeenCalledTimes(1);
-    const written = authMocks.upsert.mock.calls[0][0];
-    expect(written).toMatchObject({
+    expect(authMocks.updateUser).toHaveBeenCalledTimes(1);
+    expect(authMocks.updateUser.mock.calls[0][0]).toEqual({
+      data: {
+        display_name: "Alex Morgan",
+        phone: "+91 9999999999",
+        avatar_key: "user_pf2",
+        currency: "USD",
+      },
+    });
+    // No table access: the shared schema has no `profiles` table.
+    expect(authMocks.from).not.toHaveBeenCalled();
+    expect(profile).toMatchObject({
       id: "user-123",
       display_name: "Alex Morgan",
       email: "alex@example.com",
@@ -80,9 +90,18 @@ describe("authService v2 policy & profile schema", () => {
       avatar_key: "user_pf2",
       default_currency: "USD",
     });
-    expect(written.role).toBeUndefined();
-    expect(written.full_name).toBeUndefined();
-    expect(written.currency).toBeUndefined();
+  });
+
+  it("builds a profile from a user object with safe defaults", () => {
+    expect(profileFromUser(null)).toBeNull();
+    expect(
+      profileFromUser({ id: "u1", email: "sam@example.com", user_metadata: {} }),
+    ).toMatchObject({
+      id: "u1",
+      display_name: "sam",
+      avatar_key: "user_pf",
+      default_currency: "INR",
+    });
   });
 
   it("maps Supabase password length errors cleanly", () => {

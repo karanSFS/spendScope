@@ -16,8 +16,8 @@ email + password accounts via Supabase.
   `verifyUserPassword`, `getAuthErrorMessage`).
 - State: `redux/slices/authSlice.js`; bootstrap in `app/provider.jsx`.
 - Signup collects display name, phone (optional), currency, email, password. The DB trigger
-  `handle_new_user` creates `profiles` + `user_preferences`; the client also upserts the profile if
-  missing.
+  Profile fields are stored in Supabase Auth `user_metadata` (the shared DB has no `profiles`
+  table); `authService.profileFromUser` builds the profile object.
 
 **Rules:** password ≥ **12 chars** (client `MIN_PASSWORD_LENGTH` and Supabase config). Guest mode is
 always available even if Supabase env vars are missing (`isSupabaseConfigured` false → guest only).
@@ -206,7 +206,7 @@ an **RFC-5545 `.ics`** recurring event can be downloaded
 ## 14. Theming & appearance
 
 Light ("warm parchment") / Dark ("espresso") + 28 accent presets or custom color; synced for signed-in
-users as `user_preferences`. Details in [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md).
+users inside Auth `user_metadata.spendscope_web.appearance`. Details in [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md).
 
 ## 15. Sync status & offline UX
 

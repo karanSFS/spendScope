@@ -51,8 +51,8 @@ anywhere in `src/`, safe to remove).
 
 `ACCENT_PRESETS` (28 swatches, default Terracotta `#C88856`, dark default Amber `#D99A6C`) +
 custom picker. UI: `components/ThemeChange.jsx` (top-bar palette button) and Settings → Accent.
-Saved through `preferencesService.saveAppearancePreference` (synced for signed-in users as
-`user_preferences.appearance_mode` / `accent_color`).
+Saved through `preferencesService.saveAppearancePreference` (synced for signed-in users in Auth
+`user_metadata.spendscope_web.appearance`: `appearance_mode` / `accent_color`).
 
 ## 4. Layout & components
 

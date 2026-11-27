@@ -415,8 +415,20 @@ export async function markOutboxError(ownerId, opId, errorMessage) {
 /**
  * Replaces synced rows from a remote pull without overwriting rows that have
  * pending local edits in sync_outbox.
+ *
+ * Options:
+ * - `merge(localRow | undefined, remoteRow)` builds the stored row. The default
+ *   replaces the local row with the remote row. The shared-schema adapter uses
+ *   it to keep web-only fields (currency, reminders, ...) the database lacks.
+ * - `keepLocal(localRow)` marks local-only rows (e.g. transfers) that must
+ *   survive a pull even though the server never holds them.
  */
-export async function reconcileRemoteStore(ownerId, storeName, remoteRows) {
+export async function reconcileRemoteStore(
+  ownerId,
+  storeName,
+  remoteRows,
+  { merge = null, keepLocal = null } = {},
+) {
   const db = await getDb(ownerId);
   if (!db) return;
 
@@ -438,8 +450,10 @@ export async function reconcileRemoteStore(ownerId, storeName, remoteRows) {
   }
 
   const localRows = await entityStore.getAll();
+  const localById = new Map(localRows.map((row) => [row.id, row]));
   for (const localRow of localRows) {
     if (pendingIds.has(localRow.id)) continue;
+    if (keepLocal && keepLocal(localRow)) continue;
     if (!remoteMap.has(localRow.id)) {
       await entityStore.delete(localRow.id);
     }
@@ -447,8 +461,9 @@ export async function reconcileRemoteStore(ownerId, storeName, remoteRows) {
 
   for (const [id, remoteRow] of remoteMap.entries()) {
     if (pendingIds.has(id)) continue;
+    const base = merge ? merge(localById.get(id), remoteRow) : remoteRow;
     await entityStore.put({
-      ...remoteRow,
+      ...base,
       sync_status: "SYNCED",
     });
   }

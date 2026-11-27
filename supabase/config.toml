@@ -1,6 +1,8 @@
-# SpendScope Supabase Configuration (New Project)
-# Linked project ref should be verified with `supabase link --project-ref erjlfsclkprqterpsoaa`
-project_id = "erjlfsclkprqterpsoaa"
+# SpendScope Supabase configuration.
+# Linked project: "SpendScope" (ref bnxqgdsxxakfkcbvkoti, ap-south-1), the database
+# SHARED with the Android and iOS apps. The schema is owned by the mobile team:
+# do not run `supabase db push` / reset from this repo. See supabase/migrations/README.md.
+project_id = "bnxqgdsxxakfkcbvkoti"
 
 [auth]
 site_url = "http://localhost:3000"

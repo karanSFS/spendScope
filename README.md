@@ -1,8 +1,8 @@
 # SpendScope
 
 A calm, editorial-styled **expense & budget tracker** built with Next.js — the web companion to the
-SpendScope Android app. Works instantly in **Guest mode** (data stays in your browser) and can
-optionally **sync with Supabase** so Web and Android share the same data.
+SpendScope Android/iOS apps. Works instantly in **Guest mode** (data stays in your browser) and can
+optionally **sync with Supabase** so Web, Android and iOS share the same account data.
 
 **Highlights:** multi-account tracking • keypad/voice/receipt-OCR transaction entry • budgets •
 Spend Buckets • categories • analytics • CSV/PDF export • 24 financial calculators • reminders •

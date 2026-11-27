@@ -26,13 +26,15 @@ Preferences that never leave the device: `app_lock` (PIN hash, salt, lockout sta
 
 ## 3. Database security (RLS)
 
-- RLS enabled on all 8 tables; `anon` role has **no privileges**; `authenticated` has CRUD, filtered by
-  `owner_id = (select auth.uid())`.
-- Child inserts/updates verify parents belong to the same user (e.g., a transaction's account,
-  category and counterparty account).
-- Functions use `set search_path = ''`; `handle_new_user` is `security definer` and execute is revoked
-  from `public`, `anon`, `authenticated`.
-- Client queries also add `.eq("owner_id", ownerId)` as defense in depth.
+- The shared project has RLS enabled on all tables with per-operation policies
+  `(select auth.uid()) = user_id` for role `authenticated`; there are no triggers or functions.
+- The web client also filters every pull by `.eq("user_id", ownerId)` as defense in depth.
+- Child rows (e.g. transactions) are not parent-ownership-checked by the database; the app only
+  writes rows belonging to the signed-in user.
+- Web-only settings and the profile live in Auth `user_metadata` (user-writable, included in the
+  JWT). Never store secrets there.
+- Security advisor (2026-11-27): leaked-password protection is **disabled** in the Supabase dashboard
+  (Auth → password security); enabling it is recommended.
 - Use the Supabase advisors (security + performance) after any schema change.
 
 ## 4. App Lock (device-local)
@@ -77,6 +79,7 @@ the browser's Web Speech API; in Chrome this may send audio to the browser vendo
 - The Supabase `project_id` in `supabase/config.toml` is not a secret; keys are.
 - Never run destructive SQL against the shared remote project without explicit approval — the same
   tables are used by the Android app and its users.
-- Deleting data through the web issues **hard deletes** to Supabase (Android may soft-delete via
-  `deleted_at`); the web pull ignores rows with `deleted_at` set.
+- Deleting data through the web issues **soft deletes** (`deleted_at` + `updated_at`) so mobile devices
+  learn about them; the web pull ignores rows with `deleted_at` set. Rows are not physically removed
+  by the web (account deletion by the user's auth cascade is the only hard removal).
 - Review `public/google…html` and `sitemap.xml` domain if the production domain changes.

@@ -1,6 +1,16 @@
 import { supabase as defaultSupabase } from "./supabaseconfig";
 import { generateUuid } from "./defaultSeeds";
 import {
+  WEB_METADATA_KEY,
+  buildRemoteDeletes,
+  buildRemoteWrites,
+  isLocalOnlyEntity,
+  mapRemoteSnapshot,
+  mergeWebSettings,
+  readWebSettings,
+  webOnlyDefaults,
+} from "./remoteSchema";
+import {
   ensureDefaults,
   ensureDefaultsUnlocked,
   exportOwnerSnapshot,
@@ -62,129 +72,123 @@ function emitSyncStatus(status) {
   }
 }
 
-export function sanitizeForRemote(entityType, record, ownerId) {
-  switch (entityType) {
-    case "accounts":
-      return {
-        id: record.id,
-        owner_id: ownerId,
-        name: record.name,
-        avatar_key: record.avatar_key ?? "user_pf",
-        currency_code: (record.currency_code || "INR").toUpperCase(),
-        is_default: Boolean(record.is_default),
-        spending_period: record.spending_period || "Monthly",
-        budget_amount:
-          record.budget_amount === "" || record.budget_amount == null
-            ? null
-            : Number(record.budget_amount),
-        include_income: Boolean(record.include_income),
-        budget_mode: Boolean(record.budget_mode),
-        expense_amount:
-          record.expense_amount === "" || record.expense_amount == null
-            ? null
-            : Number(record.expense_amount),
-        reminders: record.reminders || "Never",
-        reminder_hour:
-          record.reminder_hour == null ? null : Number(record.reminder_hour),
-        reminder_minute:
-          record.reminder_minute == null ? null : Number(record.reminder_minute),
-        hide_transactions: Boolean(record.hide_transactions),
-        created_at: record.created_at,
-        updated_at: record.updated_at,
-        deleted_at: null,
-      };
-    case "categories":
-      return {
-        id: record.id,
-        owner_id: ownerId,
-        kind: record.kind === "income" ? "income" : "expense",
-        name: record.name,
-        icon_key: record.icon_key ?? null,
-        color: record.color ?? null,
-        position: Number.isFinite(Number(record.position))
-          ? Number(record.position)
-          : 0,
-        is_default:
-          record.is_default === undefined ? null : Boolean(record.is_default),
-        created_at: record.created_at,
-        updated_at: record.updated_at,
-        deleted_at: null,
-      };
-    case "transactions":
-      return {
-        id: record.id,
-        owner_id: ownerId,
-        account_id: record.account_id,
-        category_id: record.category_id ?? null,
-        kind: record.kind === "income" ? "income" : "expense",
-        amount: Number(record.amount),
-        currency_code: (record.currency_code || "INR").toUpperCase(),
-        occurred_at: record.occurred_at,
-        note: record.note ?? null,
-        transfer_group_id: record.transfer_group_id ?? null,
-        counterparty_account_id: record.counterparty_account_id ?? null,
-        created_at: record.created_at,
-        updated_at: record.updated_at,
-        deleted_at: null,
-      };
-    case "buckets":
-      return {
-        id: record.id,
-        owner_id: ownerId,
-        account_id: record.account_id,
-        name: record.name,
-        image_key: record.image_key ?? null,
-        position: Number.isFinite(Number(record.position))
-          ? Number(record.position)
-          : 0,
-        fund_amount: Number(record.fund_amount || 0),
-        expense_amount: Number(record.expense_amount || 0),
-        created_at: record.created_at,
-        updated_at: record.updated_at,
-        deleted_at: null,
-      };
-    case "bucket_transactions":
-      return {
-        id: record.id,
-        owner_id: ownerId,
-        bucket_id: record.bucket_id,
-        kind: record.kind === "fund" ? "fund" : "expense",
-        amount: Number(record.amount),
-        occurred_at: record.occurred_at,
-        note: record.note ?? null,
-        created_at: record.created_at,
-        updated_at: record.updated_at,
-        deleted_at: null,
-      };
-    case "loan_profiles":
-      return {
-        id: record.id,
-        owner_id: ownerId,
-        name: record.name,
-        account_name: record.account_name ?? null,
-        bank_name: record.bank_name ?? null,
-        principal_amount: Number(record.principal_amount),
-        interest_rate: Number(record.interest_rate),
-        tenure_months: Number(record.tenure_months),
-        emi_amount: Number(record.emi_amount),
-        processing_fees: Number(record.processing_fees || 0),
-        loan_date: record.loan_date,
-        first_emi_date: record.first_emi_date,
-        last_emi_date: record.last_emi_date,
-        currency_code: (record.currency_code || "INR").toUpperCase(),
-        created_at: record.created_at,
-        updated_at: record.updated_at,
-        deleted_at: null,
-      };
-    case "user_preferences":
-      return {
-        owner_id: ownerId,
-        appearance_mode: record.appearance_mode === "dark" ? "dark" : "light",
-        accent_color: record.accent_color || null,
-        updated_at: record.updated_at,
-      };
-    default:
-      return record;
+/**
+ * Returns the primary remote row for an entity (shared-schema column names).
+ * Kept as a thin wrapper for tests/tools; the real mapping lives in remoteSchema.js.
+ */
+export function sanitizeForRemote(entityType, record, ownerId, ctx = {}) {
+  const { writes } = buildRemoteWrites(entityType, record, ownerId, ctx);
+  return writes[0]?.row ?? null;
+}
+
+const PAGE_SIZE = 1000;
+
+/** Reads every row (paginated; PostgREST caps responses at 1000 rows). */
+async function fetchAllRows(
+  client,
+  table,
+  ownerId,
+  { includeDeleted = false, columns = "*" } = {},
+) {
+  const rows = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    let query = client.from(table).select(columns).eq("user_id", ownerId);
+    if (!includeDeleted) query = query.is("deleted_at", null);
+    const { data, error } = await query
+      .order("id", { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    const page = data || [];
+    rows.push(...page);
+    if (page.length < PAGE_SIZE) break;
+  }
+  return rows;
+}
+
+async function readAuthUser(client) {
+  if (!client?.auth?.getUser) return null;
+  try {
+    const { data, error } = await client.auth.getUser();
+    if (error) return null;
+    return data?.user || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Persists web-only settings (per-account currency, reminders, appearance)
+ * into Auth user_metadata. The shared database has no columns for them and
+ * the mobile apps ignore this key.
+ */
+async function applyWebSettings(client, patch) {
+  if (!client?.auth?.getUser || !client?.auth?.updateUser) return;
+  const { data, error } = await client.auth.getUser();
+  if (error) throw error;
+  const user = data?.user;
+  if (!user) throw new Error("Sign in required to sync web settings.");
+
+  const existing = readWebSettings(user);
+  const merged = mergeWebSettings(existing, patch);
+  if (JSON.stringify(existing) === JSON.stringify(merged)) return;
+
+  const { error: updateError } = await client.auth.updateUser({
+    data: { [WEB_METADATA_KEY]: merged },
+  });
+  if (updateError) throw updateError;
+}
+
+async function fetchSatelliteIdMap(client, table, ownerId) {
+  const rows = await fetchAllRows(client, table, ownerId, {
+    columns: "id, account_id",
+  });
+  const map = new Map();
+  for (const row of rows) {
+    if (!map.has(row.account_id)) map.set(row.account_id, row.id);
+  }
+  return map;
+}
+
+async function buildPushContext(ownerId, client, ops) {
+  const ctx = {
+    categories: [],
+    timePeriodIds: new Map(),
+    budgetModeIds: new Map(),
+    loanMetrics: null,
+  };
+  const upsertTypes = new Set(
+    ops.filter((op) => op.operation !== "DELETE").map((op) => op.entity_type),
+  );
+
+  if (upsertTypes.has("transactions")) {
+    ctx.categories = await listEntities(ownerId, "categories");
+  }
+  if (upsertTypes.has("accounts")) {
+    const [timePeriodIds, budgetModeIds] = await Promise.all([
+      fetchSatelliteIdMap(client, "time_periods", ownerId),
+      fetchSatelliteIdMap(client, "budget_modes", ownerId),
+    ]);
+    ctx.timePeriodIds = timePeriodIds;
+    ctx.budgetModeIds = budgetModeIds;
+  }
+  if (upsertTypes.has("loan_profiles")) {
+    const { calculateLoanProfileMetrics } = await import("./calculatorEngine");
+    ctx.loanMetrics = (record) => calculateLoanProfileMetrics(record);
+  }
+  return ctx;
+}
+
+function mergeSettingsPatch(target, patch) {
+  if (!patch) return;
+  if (patch.accounts) {
+    target.accounts = { ...target.accounts, ...patch.accounts };
+  }
+  if (patch.removeAccounts) {
+    target.removeAccounts.push(...patch.removeAccounts);
+    for (const id of patch.removeAccounts) delete target.accounts[id];
+  }
+  if (patch.appearance) {
+    target.appearance = { ...(target.appearance || {}), ...patch.appearance };
   }
 }
 
@@ -230,30 +234,72 @@ export async function pushOutbox(
   let pushed = 0;
   let failed = 0;
 
+  let ctx;
+  try {
+    ctx = await buildPushContext(ownerId, client, eligible);
+  } catch (err) {
+    for (const op of eligible) {
+      await markOutboxError(
+        ownerId,
+        op.op_id,
+        err?.message || "Failed to prepare sync",
+      );
+    }
+    return { pushed: 0, failed: eligible.length, ...(deferred ? { deferred } : {}) };
+  }
+
+  // Ops whose completion also needs the web-settings blob written.
+  const awaitingSettings = [];
+  const settingsPatch = { accounts: {}, removeAccounts: [], appearance: null };
+
   for (const op of [...upserts, ...deletes]) {
     try {
+      let opSettings = null;
+
       if (op.operation === "DELETE") {
-        const { error } = await client
-          .from(op.entity_type)
-          .delete()
-          .eq("id", op.entity_id)
-          .eq("owner_id", ownerId);
-        if (error) throw error;
+        // Shared schema relies on deleted_at tombstones: soft delete, never hard delete.
+        const plan = buildRemoteDeletes(
+          op.entity_type,
+          op.entity_id,
+          ownerId,
+          new Date().toISOString(),
+        );
+        for (const del of plan.deletes) {
+          let query = client.from(del.table).update(del.patch);
+          for (const [column, value] of Object.entries(del.match)) {
+            query = query.eq(column, value);
+          }
+          const { error } = await query;
+          if (error) throw error;
+        }
+        opSettings = plan.settingsPatch;
       } else {
-        const cleanPayload = sanitizeForRemote(
+        const built = buildRemoteWrites(
           op.entity_type,
           op.payload,
           ownerId,
+          ctx,
         );
-        const onConflict =
-          op.entity_type === "user_preferences" ? "owner_id" : "id";
-        const { error } = await client
-          .from(op.entity_type)
-          .upsert(cleanPayload, { onConflict });
-        if (error) throw error;
+        for (const write of built.writes) {
+          const { error } = await client
+            .from(write.table)
+            .upsert(write.row, { onConflict: write.onConflict });
+          if (error) throw error;
+        }
+        opSettings = built.settingsPatch;
+        if (built.localOnly) {
+          await removeOutboxOp(ownerId, op.op_id, op.entity_type, op.entity_id);
+          continue;
+        }
       }
-      await removeOutboxOp(ownerId, op.op_id, op.entity_type, op.entity_id);
-      pushed++;
+
+      if (opSettings) {
+        mergeSettingsPatch(settingsPatch, opSettings);
+        awaitingSettings.push(op);
+      } else {
+        await removeOutboxOp(ownerId, op.op_id, op.entity_type, op.entity_id);
+        pushed++;
+      }
     } catch (err) {
       failed++;
       await markOutboxError(
@@ -264,10 +310,33 @@ export async function pushOutbox(
     }
   }
 
+  if (awaitingSettings.length > 0) {
+    try {
+      await applyWebSettings(client, settingsPatch);
+      for (const op of awaitingSettings) {
+        await removeOutboxOp(ownerId, op.op_id, op.entity_type, op.entity_id);
+        pushed++;
+      }
+    } catch (err) {
+      for (const op of awaitingSettings) {
+        failed++;
+        await markOutboxError(
+          ownerId,
+          op.op_id,
+          err?.message || "Failed to sync web settings",
+        );
+      }
+    }
+  }
+
   return deferred > 0 ? { pushed, failed, deferred } : { pushed, failed };
 }
 
-export async function pullRemote(ownerId, client = defaultSupabase) {
+export async function pullRemote(
+  ownerId,
+  client = defaultSupabase,
+  { defaultCurrency = null } = {},
+) {
   if (!ownerId || !client) {
     return { pulled: false, skipped: true };
   }
@@ -276,89 +345,86 @@ export async function pullRemote(ownerId, client = defaultSupabase) {
   }
 
   const [
-    accountsRes,
-    categoriesRes,
-    transactionsRes,
-    bucketsRes,
-    bucketTxRes,
-    loanRes,
-    prefsRes,
+    accounts,
+    categories,
+    transactions,
+    buckets,
+    bucketTransactions,
+    loans,
+    timePeriods,
+    budgetModes,
+    authUser,
   ] = await Promise.all([
-    client
-      .from("accounts")
-      .select("*")
-      .eq("owner_id", ownerId)
-      .is("deleted_at", null),
-    client
-      .from("categories")
-      .select("*")
-      .eq("owner_id", ownerId)
-      .is("deleted_at", null),
-    client
-      .from("transactions")
-      .select("*")
-      .eq("owner_id", ownerId)
-      .is("deleted_at", null),
-    client
-      .from("buckets")
-      .select("*")
-      .eq("owner_id", ownerId)
-      .is("deleted_at", null),
-    client
-      .from("bucket_transactions")
-      .select("*")
-      .eq("owner_id", ownerId)
-      .is("deleted_at", null),
-    client
-      .from("loan_profiles")
-      .select("*")
-      .eq("owner_id", ownerId)
-      .is("deleted_at", null),
-    client
-      .from("user_preferences")
-      .select("*")
-      .eq("owner_id", ownerId)
-      .maybeSingle(),
+    fetchAllRows(client, "accounts", ownerId),
+    // Soft-deleted categories are still needed to classify old transactions.
+    fetchAllRows(client, "categories", ownerId, { includeDeleted: true }),
+    fetchAllRows(client, "transactions", ownerId),
+    fetchAllRows(client, "spend_buckets", ownerId),
+    fetchAllRows(client, "spend_bucket_transactions", ownerId),
+    fetchAllRows(client, "loans", ownerId),
+    fetchAllRows(client, "time_periods", ownerId),
+    fetchAllRows(client, "budget_modes", ownerId),
+    readAuthUser(client),
   ]);
 
-  const errors = [
-    accountsRes.error,
-    categoriesRes.error,
-    transactionsRes.error,
-    bucketsRes.error,
-    bucketTxRes.error,
-    loanRes.error,
-    prefsRes.error,
-  ].filter(Boolean);
+  const webSettings = readWebSettings(authUser);
+  const currency =
+    authUser?.user_metadata?.currency || defaultCurrency || "INR";
 
-  if (errors.length > 0) {
-    throw errors[0];
-  }
-
-  await reconcileRemoteStore(ownerId, "accounts", accountsRes.data || []);
-  await reconcileRemoteStore(ownerId, "categories", categoriesRes.data || []);
-  await reconcileRemoteStore(
-    ownerId,
-    "transactions",
-    transactionsRes.data || [],
+  const mapped = mapRemoteSnapshot(
+    {
+      accounts,
+      categories,
+      transactions,
+      buckets,
+      bucketTransactions,
+      loans,
+      timePeriods,
+      budgetModes,
+    },
+    { ownerId, webSettings, defaultCurrency: currency },
   );
-  await reconcileRemoteStore(ownerId, "buckets", bucketsRes.data || []);
+
+  // Remote values win for fields the shared schema stores; web-only fields
+  // (currency, reminders, ...) keep their local value or a sensible default.
+  const mergeFor = (store) => (local, remote) => ({
+    ...webOnlyDefaults(store, { defaultCurrency: currency }),
+    ...(local || {}),
+    ...remote,
+  });
+
+  await reconcileRemoteStore(ownerId, "accounts", mapped.accounts, {
+    merge: mergeFor("accounts"),
+  });
+  await reconcileRemoteStore(ownerId, "categories", mapped.categories, {
+    merge: mergeFor("categories"),
+  });
+  await reconcileRemoteStore(ownerId, "transactions", mapped.transactions, {
+    merge: mergeFor("transactions"),
+    keepLocal: (row) => isLocalOnlyEntity("transactions", row),
+  });
+  await reconcileRemoteStore(ownerId, "buckets", mapped.buckets, {
+    merge: mergeFor("buckets"),
+  });
   await reconcileRemoteStore(
     ownerId,
     "bucket_transactions",
-    bucketTxRes.data || [],
+    mapped.bucket_transactions,
+    { merge: mergeFor("bucket_transactions") },
   );
-  await reconcileRemoteStore(ownerId, "loan_profiles", loanRes.data || []);
+  await reconcileRemoteStore(ownerId, "loan_profiles", mapped.loan_profiles, {
+    merge: mergeFor("loan_profiles"),
+  });
 
-  if (prefsRes.data) {
+  if (webSettings.appearance) {
     const outbox = await listOutbox(ownerId);
     const hasPendingPrefs = outbox.some(
       (op) => op.entity_type === "user_preferences",
     );
     if (!hasPendingPrefs) {
       await setPreference(ownerId, "appearance", {
-        appearance_mode: prefsRes.data.appearance_mode,
-        accent_color: prefsRes.data.accent_color,
+        appearance_mode: webSettings.appearance.appearance_mode,
+        accent_color: webSettings.appearance.accent_color ?? null,
       });
     }
   }
@@ -419,10 +485,10 @@ export async function syncNow(
     emitSyncStatus({ state: "syncing", pendingCount: pendingBefore.length });
     try {
       const pushRes = await pushOutbox(ownerId, client, { ignoreBackoff });
-      await pullRemote(ownerId, client);
+      await pullRemote(ownerId, client, { defaultCurrency });
 
       // Seed defaults only AFTER a clean pull confirms no remote accounts/categories exist,
-      // preventing collisions with Android backups.
+      // preventing collisions with data created by the mobile apps.
       const seedRes = await ensureDefaultsUnlocked({
         ownerId,
         currencyCode: defaultCurrency,

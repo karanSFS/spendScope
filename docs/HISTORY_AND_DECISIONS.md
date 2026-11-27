@@ -12,9 +12,15 @@ README) and evolved into a **web port of the SpendScope Android app** (`../spend
 The goal: feature parity with Android, cross-platform sync through the same Supabase tables, plus
 web-specific upgrades (guest mode, OCR, voice, PDF/CSV, 24 calculators, App Lock via PIN/passkey).
 
-A fresh Supabase project ("v2") was created with a schema strictly compatible with the Android data
-shape (`202611260001_spendscope_v2_schema.sql`); the earlier project's definitions are archived in
+A fresh Supabase project ("v2", `erjlfsclkprqterpsoaa`) was first created with a web-owned `owner_id`
+schema modelled on the Android data shape (`202611260001_spendscope_v2_schema.sql`, now archived in
+`supabase/_archive_old_project/web_v2_owner_id/`); the earlier project's definitions are archived in
 `supabase/_archive_old_project/`.
+
+**2026-11-27 — switch to the shared mobile database.** The team created one Supabase project
+(`bnxqgdsxxakfkcbvkoti`, "SpendScope") whose `user_id`-based schema is used by the Android and iOS
+apps. The web app was adapted to it without touching the database: see §10 below and
+[DATA_AND_SYNC.md §3](./DATA_AND_SYNC.md#3-cloud-schema-supabase-postgres-shared-with-android--ios).
 
 ## 2. Build phases (as reflected by the tests)
 
@@ -87,13 +93,13 @@ A full functional review of all 24 calculators and core finance flows. Fixes (al
 | --- | --- | --- | --- |
 | 1 | **Local-first with IndexedDB + outbox** | Instant UI, offline use, guest mode without a backend | Need a sync engine, conflict policy and merge logic |
 | 2 | **Guest-first, no route protection** | Zero-friction onboarding; privacy-friendly | Middleware only handles legacy redirects; "auth" gating is by feature (sync) not route |
-| 3 | **Same Supabase tables as Android** | One account across Web ↔ Android | Strict column compatibility; web-only features get separate tables (`loan_profiles`, `user_preferences`) |
+| 3 | **Web adapts to the shared mobile DB (superseded the web-owned schema on 2026-11-27)** | One account across Web ↔ Android ↔ iOS; mobile developers own the schema | Mapping layer `remoteSchema.js`; web-only data lives in Auth `user_metadata`; no DB migrations from this repo |
 | 4 | **No server-side seeding** | Android backups must not collide with pre-seeded defaults | Seed on client **after** a clean pull |
 | 5 | **Device-local App Lock** | Cloud never stores secrets; matches Android | Not encrypted at rest; passkey is convenience only |
-| 6 | **Hard deletes pushed to cloud** | Simple outbox semantics | `deleted_at` columns are for Android compatibility; web ignores them on pull |
-| 7 | **Transfers = paired expense/income rows with `transfer_group_id`** | Matches Android model; works with existing CHECK constraints | Every aggregation must exclude `transfer_group_id` rows |
+| 6 | **Soft deletes pushed to cloud** (was hard deletes before 2026-11-27) | Mobile apps sync by `updated_at`/`deleted_at`; hard deletes would never reach them | Every delete is an UPDATE of `deleted_at`+`updated_at`; pulls filter `deleted_at is null` |
+| 7 | **Transfers = paired expense/income rows with `transfer_group_id`, local-only** | Neutral in totals; the shared schema has no column to link the pair | Every aggregation must exclude `transfer_group_id` rows; transfers do not sync to other devices |
 | 8 | **Minor-unit aggregation** | Prevent float drift and Android's truncation bugs | Slight verbosity in sums; enforced by tests |
-| 9 | **Local-midnight → UTC for dates** | Compatibility with Android's `FinancialSyncWorker` | Always use `dateUtils` |
+| 9 | **Local-midnight → UTC for dates** | Day grouping must be timezone-correct | Always use `dateUtils`; remote date = `created_at` (assumption, §10) |
 | 10 | **Self-hosted Tesseract** | Privacy: receipts never leave the device; works offline | ~28 MB of static assets in `public/tesseract` |
 | 11 | **Redux only for UI/theme/auth, not data** | Data of record is IndexedDB | Hooks refresh on `subscribeDataChanged` |
 | 12 | **Tailwind v4 + CSS variable tokens** | Runtime accent/dark theming | Tokens duplicated in CSS and `theme.js` (keep in sync) |
@@ -115,7 +121,7 @@ Nothing here is user-facing broken; it is cleanup/risks to be aware of.
    (`logingAuth`, `logoutUser`) kept "for phased migration".
 6. Legacy redirect pages (`/calculators-m`, `/spend-budget`) are redundant with `middleware.js` redirects.
 7. The calculator components live in `app/(private)/calculators-m/components/` (misleading folder name).
-8. DB CHECK allows `transactions.kind = 'transfer'`, but web never writes it (coerces to income/expense).
+8. *(Resolved 2026-11-27)* The old `kind = 'transfer'` CHECK no longer exists; the shared schema has no `kind` column at all.
 9. `/loader-preview` returns the 404 UI with HTTP **200** in production (not a true 404); it's `noindex`.
 10. No conflict resolution beyond "pending local wins, else remote wins" — concurrent edits from
     Android and Web can overwrite each other (last push wins).
@@ -133,7 +139,8 @@ Nothing here is user-facing broken; it is cleanup/risks to be aware of.
 - Remove debt items above; add CI running lint, unit tests, build and Playwright.
 - Encrypt IndexedDB data at rest (derive key from PIN) if stronger privacy is needed.
 - Incremental sync (pull deltas via `updated_at`) instead of full-table pulls.
-- Soft-delete/tombstones to resolve Web↔Android delete conflicts.
+- Confirm the open mobile-schema assumptions (§10) with the Android/iOS developers and remove the `ASSUMPTION:` markers in `remoteSchema.js`.
+- Sync transfers (needs an agreed additive column or convention on the shared schema).
 - Recurring transactions, multi-currency reporting, budget per category.
 - True 404 status for the gated `/loader-preview` page (e.g., via `middleware` or route removal in prod).
 - PWA/installability and push-style reminders.
@@ -145,3 +152,36 @@ Nothing here is user-facing broken; it is cleanup/risks to be aware of.
 3. [DATA_AND_SYNC.md](./DATA_AND_SYNC.md) → the part most likely to bite if changed.
 4. [FEATURES.md](./FEATURES.md) → locate code for the feature you're touching.
 5. Run `npm install && npm test && npm run build` to confirm the toolchain still works before editing.
+
+## 10. Switch to the shared mobile database (2026-11-27)
+
+**Trigger:** the user pointed `.env.local` at a new Supabase project used by their Android and iOS
+developers and asked the web app to work with it. The new schema differs from the web's `owner_id`
+schema (`user_id`, renamed tables, no `kind`/date/currency columns, no `profiles`/`user_preferences`
+tables, no triggers; `spend_buckets`, `loans`, `time_periods`, `budget_modes`, `carry_overs`,
+`transaction_repeatings`).
+
+**Decision (recommended and approved):** adapt the web app to the database as-is; never alter the
+shared database; keep web-only data in Auth `user_metadata`.
+
+**What changed**
+- New pure mapping layer `src/lib/remoteSchema.js` (+ `tests/unit/remoteSchema.test.js`).
+- `syncEngine.js`: push/pull rewritten around the mapping layer; paginated pulls; soft deletes;
+  satellite tables (`time_periods`, `budget_modes`); web settings blob; transfers local-only.
+- `localDb.reconcileRemoteStore` gained `merge` and `keepLocal` options.
+- `authService.js`: profile read/written from Auth `user_metadata` (no `profiles` table).
+- `supabase/config.toml` + `.temp` link point at the new project; the old web migration was moved to
+  `_archive_old_project/web_v2_owner_id/`; `supabase/migrations/` is intentionally empty.
+- Tests updated (`syncEngine`, `phase5Advanced` guest-merge, `authService`).
+
+**Open assumptions (unconfirmed by the mobile developers; isolated in `remoteSchema.js`)**
+1. A transaction's date is `transactions.created_at` (no dedicated date column; back-dating unverified).
+2. Income/expense is determined by `categories.type`.
+3. `spend_bucket_transactions.bucket_transaction_type` uses `fund` / `expense` (table was empty).
+4. `accounts.avatar` `avatarN` corresponds to web avatar `N-1` (0-based list).
+5. `accounts.is_current` ≈ web `is_default`.
+6. Transfers (paired rows) cannot be represented and stay on the device.
+
+**Questions for the mobile developers:** where is a transaction's date stored (and can users
+back-date)? how are transfers, currencies and the `Carry Over` category meant to be modelled? what
+are the `bucket_transaction_type` values?

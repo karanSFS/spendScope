@@ -54,16 +54,17 @@ testing from a phone on your network.
 | `dateUtils.test.js` | Local-midnight conversions, period bounds |
 | `expressionParser.test.js` | Precedence, unary minus, errors |
 | `localDb.test.js` | Per-owner isolation, idempotent seeding (1 + 21), outbox, `app_lock` never queued |
-| `syncEngine.test.js` | Payload sanitizing, parent/child ordering, pull-before-seed |
+| `syncEngine.test.js` | Shared-schema push/pull: ordering, soft deletes, local-only transfers, pull-before-seed, Auth-metadata settings, satellite reuse |
 | `accountsAndBuckets.test.js` | Account rules, bucket totals/reorder |
 | `categoriesAndSettings.test.js` | Category delete → Other, transfers, 4 reset modes, PIN/ICS |
 | `loanProfilesService.test.js` | Loan validation/sync |
-| `authService.test.js` | 12-char policy, v2 profile columns |
+| `authService.test.js` | 12-char policy, profile stored in Auth `user_metadata` |
+| `remoteSchema.test.js` | Shared-DB mapping layer: icons/avatars, kind/date derivation, satellites, soft deletes, bucket totals, loans |
 | `exports.test.js` | CSV escaping/injection, PDF generation, totals reconcile |
 | `phase5Advanced.test.js` | Receipt OCR parser, voice parser, PIN lockout, reminders, guest→cloud merge |
 
 Alias `@` → `src` (vitest config). Setup file loads `fake-indexeddb/auto` and jest-dom matchers.
-State at 2026-11-27: **72 tests passing**.
+State at 2026-11-27: **95 tests passing** (13 files).
 
 ### End-to-end (`tests/e2e/*.spec.mjs`, Playwright)
 
@@ -88,12 +89,15 @@ for any calculation, sync or money-handling change.
 
 ## 5. Working with the database
 
-- Schema file: `supabase/migrations/202611260001_spendscope_v2_schema.sql`. Add **new** migration files
-  (timestamped) for changes instead of editing applied ones.
-- Keep Android compatibility rules ([DATA_AND_SYNC.md](./DATA_AND_SYNC.md#android-compatibility-rules)).
+- The database is **shared with the Android/iOS apps and owned by the mobile team**. This repo has no
+  migrations (`supabase/migrations/README.md`). Never run `supabase db push`/reset from here.
+- Cloud knowledge lives in `src/lib/remoteSchema.js`; extend it (and `tests/unit/remoteSchema.test.js`)
+  instead of sprinkling column names around. Read the mobile-compatibility rules
+  ([DATA_AND_SYNC.md §3.4](./DATA_AND_SYNC.md#34-mobile-compatibility-rules)).
 - IndexedDB changes need `DB_VERSION` bump + `upgrade` logic in `src/lib/localDb.js`.
 - If you add a synced entity: update `ENTITY_STORES`, `UPSERT_ORDER` / `DELETE_ORDER`,
-  `sanitizeForRemote`, `pullRemote`, guest merge, reset/delete services, RLS policies and tests.
+  `remoteSchema.js` (`buildRemoteWrites`, `buildRemoteDeletes`, `mapRemoteSnapshot`), `pullRemote`,
+  guest merge, reset/delete services and tests. A new cloud table/column needs mobile-team agreement.
 
 ## 6. Deployment
 
@@ -122,7 +126,7 @@ for any calculation, sync or money-handling change.
 | E2E "browser not found" | No system Chrome → `npx playwright install chromium` |
 | Theme doesn't change when toggling `dark` class manually | Tokens are inline vars set from Redux — use the theme toggle/actions |
 | Sync stuck "Sync retry" | Open the banner message/`lastError`; RLS or constraint violation (check payload vs schema); click Retry |
-| Duplicate default account/categories after Android backup | Seeding happened before pull — seeding must stay *after* a successful `pullRemote` |
+| Duplicate default account/categories after mobile-app data exists | Seeding happened before pull — seeding must stay *after* a successful `pullRemote` |
 | Numbers off by 0.01 | Something summed floats; aggregate with `Math.round(x*100)` |
 | Transaction on wrong day | Used UTC date string instead of `dateUtils` local-midnight helpers |
 | Wipe all local data in dev | DevTools → Application → IndexedDB → delete `spendscope_*`; clear localStorage key `persist:root` |

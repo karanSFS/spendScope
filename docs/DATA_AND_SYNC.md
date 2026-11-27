@@ -1,7 +1,7 @@
 # Data Model & Sync
 
 SpendScope is **local-first**. IndexedDB is the working database; Supabase Postgres is the
-cloud backup / cross-device (Web ↔ Android) store. This document covers both, plus the sync
+cloud backup / cross-device store, **shared with the Android and iOS apps**. This document covers both, plus the sync
 engine that connects them.
 
 ## 1. Ownership & isolation
@@ -22,13 +22,13 @@ engine that connects them.
 | `transactions` | `id` | `by_account`, `by_occurred`, `by_category` | yes |
 | `buckets` | `id` | `by_account` | yes |
 | `bucket_transactions` | `id` | `by_bucket` | yes |
-| `loan_profiles` | `id` | — | yes (web-only table) |
-| `preferences` | `key` | — | **only `appearance`** |
+| `loan_profiles` | `id` | — | yes (`loans` table) |
+| `preferences` | `key` | — | **only `appearance`** (via Auth metadata) |
 | `sync_outbox` | `op_id` | `by_seq` | internal |
 
 `ENTITY_STORES` = `accounts, categories, transactions, buckets, bucket_transactions, loan_profiles`.
 
-**Preference keys used:** `appearance` (synced as `user_preferences`), `app_lock` (device-only),
+**Preference keys used:** `appearance` (synced inside Auth `user_metadata`, see §3.3), `app_lock` (device-only),
 `sync_meta` (`last_pull_at`, `last_sync_at`, `initial_pull_done`), `guest_migration_meta`
 (guest DB: list of owner IDs already merged), `guest_migration_id_map` (per owner),
 `reminder_meta` (last fired period key per account).
@@ -60,49 +60,88 @@ Outbox coalescing (`upsertOutboxTx`): only one op per `(entity_type, entity_id)`
 replaces the payload; a DELETE replaces any earlier op. Each op: `{op_id, seq, entity_type,
 entity_id, operation, payload, status, attempts, last_error, next_retry_at, …}`.
 
-## 3. Cloud schema (Supabase Postgres)
+## 3. Cloud schema (Supabase Postgres, shared with Android / iOS)
 
-Source of truth: `supabase/migrations/202611260001_spendscope_v2_schema.sql`
-(`project_id` in `supabase/config.toml`). All tables have RLS enabled and `anon` has **no** grants;
-`authenticated` gets CRUD limited by policies.
+> **Big picture (2026-11-27):** the web app no longer owns its cloud schema. It connects to the
+> Supabase project **SpendScope** (`bnxqgdsxxakfkcbvkoti`, ap-south-1) whose tables are designed and
+> owned by the mobile team (live migration `init_spend_scope_schema`). The web app adapts to it via
+> **`src/lib/remoteSchema.js`** (pure mapping functions, unit-tested) and **never alters the database**.
+> The earlier web-only `owner_id` schema is archived in
+> `supabase/_archive_old_project/web_v2_owner_id/` for history only. **Do not apply it to the shared
+> project.** `supabase/migrations/` is intentionally empty (see its README).
 
-| Table | Purpose | Notes |
+### 3.1 Live tables
+
+All tables: RLS enabled, per-operation policies `(select auth.uid()) = user_id` for role
+`authenticated`, `user_id` defaults to `auth.uid()`, `created_at/updated_at` default `now()`, and a
+nullable `deleted_at` tombstone. There are **no triggers or functions**: the client must set
+`updated_at` itself.
+
+| Table | Columns that matter | Notes |
 | --- | --- | --- |
-| `profiles` | `id`→`auth.users`, `display_name` (1–80), `email`, `phone`, `avatar_key`, `default_currency` (`^[A-Z]{3}$`) | Created by trigger on signup |
-| `accounts` | name, avatar, currency, `is_default`, `spending_period`, `budget_amount`, `include_income`, `budget_mode`, `expense_amount`, `reminders`, `reminder_hour/minute`, `hide_transactions`, soft-delete `deleted_at` | Unique: one default per owner (partial), unique `(owner, lower(name))` when not deleted |
-| `categories` | `kind` (`income`/`expense`), name, `icon_key`, `color`, `position`, `is_default` | Unique `(owner, kind, lower(name))` when not deleted |
-| `transactions` | `account_id`, `category_id` (set null on delete), `kind` (`income`/`expense`/`transfer` allowed by CHECK), `amount numeric(18,2) > 0`, `currency_code`, `occurred_at timestamptz`, `note`, `transfer_group_id`, `counterparty_account_id` | Indexes by owner/account/category/transfer group |
-| `buckets` | per-account goal: `name`, `image_key`, `position`, `fund_amount`, `expense_amount` | Aggregates maintained by trigger |
-| `bucket_transactions` | `kind` (`fund`/`expense`), `amount > 0`, `occurred_at`, `note` | Trigger `recalculate_bucket_totals` updates parent bucket |
-| `loan_profiles` | **Web-only** (Android keeps loans locally): principal, rate (0–30), tenure (1–600), EMI, fees, dates | |
-| `user_preferences` | **Web-only**: `appearance_mode` (`light`/`dark`), `accent_color` (`#RRGGBB`) | PK `owner_id` |
+| `accounts` | `name`, `avatar` (`avatarN`), `chart_color`, `time_stamp`, `is_hide_future_transaction`, `is_current` | Unique `(user_id, name)` where not deleted |
+| `time_periods` | `account_id`, `show_spendings`, `week_start_day`, `month_start_day` (**NOT NULL, no default**) | One row per account (satellite) |
+| `budget_modes` | `account_id`, `is_on`, `amount` (text), `is_include_income` (default **true**) | One row per account (satellite) |
+| `carry_overs` | `account_id`, `is_on`, `only_positive` | Mobile-only; web never writes it |
+| `categories` | `name`, `icon` (e.g. `diningOut`), `chart_color`, `type` (`expense`/`income`), `is_custom`, `position` (global across both types), `has_deleted` | Includes a mobile-only `Carry Over` income category |
+| `transactions` | `account_id`, `category_id` (**NOT NULL**, FK `RESTRICT`), `amount float8`, `notes` | **No kind, date or currency column** |
+| `transaction_repeatings` | `transaction_id`, `start_date`, `end_date`, `time_period` | Mobile-only; web ignores |
+| `spend_buckets` | `account_id`, `bucket_name`, `icon`, `bucket_created_at`, `sort_order` | No totals column |
+| `spend_bucket_transactions` | `bucket_id`, `amount` (text), `bucket_transaction_type` (text), `notes` | Table was empty at integration time |
+| `loans` | `loan_name`, `loan_account_number`, `bank_name`, `amount/interest_rate/tenure_months/processing_fees` (text), `emi_amount`, 3 dates (timestamptz), 7 derived float totals (`interest_paid`, `principal_paid`, `total_paid`, `outstanding_*`, `total_interest`) | |
 
-Triggers/functions: `set_updated_at` on every table; `handle_new_user()` (security definer, creates
-**only** `profiles` + `user_preferences`, never accounts/categories); `recalculate_bucket_totals()`.
+All foreign keys are `ON DELETE CASCADE` except `transactions.category_id` (`RESTRICT`).
+Auth config (`supabase/config.toml`): email signups on, minimum password length 12.
+Advisor note: leaked-password protection is disabled in the dashboard (recommended to enable).
 
-RLS: all policies are `owner_id = (select auth.uid())`; child-table `WITH CHECK` also verifies that
-the referenced account/category/bucket belongs to the same user and (unless deleting) isn't deleted.
+### 3.2 Mapping layer (`src/lib/remoteSchema.js`)
 
-Auth config (`supabase/config.toml`): email signups on, **minimum password length 12**, local
-`site_url http://localhost:3000`.
+| Web (local) | Shared DB | Rule |
+| --- | --- | --- |
+| `owner_id` | `user_id` | Local rows keep `owner_id`; every remote filter/write uses `user_id` |
+| `buckets` / `bucket_transactions` / `loan_profiles` | `spend_buckets` / `spend_bucket_transactions` / `loans` | Renamed tables and columns (`name`↔`bucket_name`/`loan_name`, `image_key`↔`icon`, `position`↔`sort_order`, `note`↔`notes`, `principal_amount`↔`amount`, `account_name`↔`loan_account_number`) |
+| `accounts.is_default` | `accounts.is_current` | Pull normalises to exactly one default (earliest `created_at` wins on ties/none) |
+| `accounts.avatar_key` (`user_pf`, `user_pf1`…) | `avatar` (`avatar1`…) | `avatarN` = `AVATAR_KEYS[N-1]`; unknown mobile values are preserved in `remote_avatar` |
+| `accounts.spending_period` | `time_periods.show_spendings` | Satellite row; existing row IDs are looked up before upsert. `week_start_day='Sunday'` / `month_start_day=1` written **only** when creating a row |
+| `accounts.budget_mode/budget_amount/include_income` | `budget_modes.is_on/amount(text)/is_include_income` | Satellite row |
+| `categories.kind` / `icon_key` / `color` / `is_default` | `type` / `icon` / `chart_color` / `!is_custom` | Icon name table in `ICON_PAIRS`; `carryOver` shown with `money_transfer` and preserved (`remote_icon`) |
+| `transactions.kind` | `categories.type` | **ASSUMPTION:** income/expense is derived from the category's type |
+| `transactions.occurred_at` | `transactions.created_at` | **ASSUMPTION:** the date is `created_at` (keeps time-of-day unless the user back-dates; then local midnight of the chosen day) |
+| `transactions.category_id` null | falls back to the "Other" category of the same kind | `category_id` is NOT NULL remotely; a mismatching kind also falls back |
+| `transactions.currency_code` | — | Derived from the account's currency on pull |
+| `bucket_transactions.kind` | `bucket_transaction_type` | **ASSUMPTION:** values `fund` / `expense` (parsed case-insensitively on pull) |
+| bucket `fund_amount/expense_amount` | — | Recomputed from entries on pull |
+| Loan derived metrics | 7 float columns | Computed by `calculateLoanProfileMetrics` at push time |
 
-### Android compatibility rules
+Items marked **ASSUMPTION** were inferred from live data and could not be confirmed against the
+mobile source code. They are isolated in `remoteSchema.js` (search `ASSUMPTION:`); change them there
+once the Android/iOS developers confirm.
 
-(From the header of the schema file — keep them.)
+### 3.3 Web-only data that has no column
 
-- Shared tables (`accounts, categories, transactions, buckets, bucket_transactions`) keep Android's
-  exact column types, nullability, CHECKs and unique indexes.
-- Additive web columns on shared tables must be **nullable and unconstrained**.
-- **No** server-side seeding of accounts/categories.
-- **No** passcode/lockout columns in the cloud — App Lock is device-local.
-- Web-only tables: `loan_profiles`, `user_preferences`.
-- Account transfers use `kind` `expense` + `income` with `transfer_group_id` (the `transfer` value
-  allowed by the CHECK is not used by web; `sanitizeForRemote` coerces to income/expense).
-- Colors for default categories are the first 15 of Android's `colors.json`
-  (`ANDROID_DEFAULT_CATEGORY_COLORS`).
-- Time convention matches Android's `FinancialSyncWorker`: `occurred_at` = local midnight → UTC ISO.
+Stored in Supabase Auth **`user_metadata`** (ignored by the mobile apps):
 
-The pre-v2 database definitions live in `supabase/_archive_old_project/` for reference only.
+- Profile: `display_name`, `phone`, `avatar_key`, `currency` (replaces the old `profiles` table;
+  `authService.profileFromUser`).
+- `spendscope_web` blob: `{ appearance: {appearance_mode, accent_color}, accounts: { [accountId]: {
+  currency_code, reminders, reminder_hour, reminder_minute, hide_transactions, expense_amount } } }`.
+  Written by `applyWebSettings` in the push step, read on pull.
+- **Transfers stay local-only.** They are paired expense/income rows linked by `transfer_group_id`,
+  which the shared schema cannot represent. They are never pushed, survive pulls (`keepLocal`), and
+  other devices never see them (they are neutral in totals anyway).
+
+### 3.4 Mobile-compatibility rules
+
+- **Never alter the shared database from this repo.** Any DB change must be purely additive and
+  agreed with the Android and iOS developers first.
+- **Soft delete only.** Web deletes become `UPDATE … SET deleted_at, updated_at` (categories also
+  `has_deleted = true`; deleting an account also tombstones its `time_periods`, `budget_modes`,
+  `carry_overs`). Hard deletes would never reach other devices that sync by `updated_at`.
+- Always send a real `updated_at` (no trigger exists).
+- Upserts only send columns the web owns, so mobile-owned columns (`chart_color`, `week_start_day`,
+  `is_hide_future_transaction`, …) on existing rows are not overwritten.
+- **No** server-side seeding; the client seeds defaults only after a clean pull.
+- **No** passcode/lockout data in the cloud — App Lock is device-local.
 
 ## 4. Sync engine (`src/lib/syncEngine.js`)
 
@@ -111,21 +150,27 @@ The pre-v2 database definitions live in `supabase/_archive_old_project/` for ref
 - Upserts push **parents first**: accounts → categories → transactions → buckets →
   bucket_transactions → loan_profiles → user_preferences.
 - Deletes push **children first**: bucket_transactions → buckets → transactions → categories →
-  accounts → loan_profiles.
-- Deletes are **hard deletes** on the server (`.delete().eq(id).eq(owner_id)`); the `deleted_at`
-  columns exist for Android compatibility, and the web **pulls with `deleted_at is null`**.
+  accounts → loan_profiles. Each is a **soft delete** (see §3.4).
 
 ### `pushOutbox(ownerId, client, {ignoreBackoff})`
-Skips if no owner/client or `navigator.onLine === false`. For each eligible op: sanitize payload
-(`sanitizeForRemote` builds the exact remote column set per table) → `upsert(..., onConflict id)`
-(or `owner_id` for `user_preferences`) → on success remove from outbox and mark local row `SYNCED`;
-on failure `markOutboxError` with exponential backoff `min(60s, 2s × 2^(attempts-1))`.
+Skips if no owner/client or `navigator.onLine === false`. First builds a context (local categories
+for transaction category resolution, existing `time_periods`/`budget_modes` row IDs per account,
+lazy-loaded loan metrics). For each eligible op: `buildRemoteWrites` (upsert, one or several tables)
+or `buildRemoteDeletes` (soft delete) → on success remove from outbox and mark the local row
+`SYNCED`; on failure `markOutboxError` with exponential backoff `min(60s, 2s × 2^(attempts-1))`.
+Local-only entities (transfers) are dropped from the outbox without a request. Ops that also carry
+web-only settings (account upserts/deletes, appearance) are completed only after one
+`auth.updateUser({data:{spendscope_web}})` succeeds; otherwise they are retried.
 
-### `pullRemote(ownerId, client)`
-Parallel `select *` of all seven tables for the owner (`deleted_at is null`), throws on any error,
-then `reconcileRemoteStore` per store (remote rows replace local **unless that id has a pending
-outbox op**; local rows missing remotely are deleted unless pending). Preferences are applied only
-if no pending preference op. Writes `sync_meta`.
+### `pullRemote(ownerId, client, {defaultCurrency})`
+Paginated (1000-row pages; PostgREST caps responses) `select *` of `accounts`, `categories`
+(**including soft-deleted**, needed to classify old transactions), `transactions`, `spend_buckets`,
+`spend_bucket_transactions`, `loans`, `time_periods`, `budget_modes`, all filtered by `user_id`,
+plus `auth.getUser()` for the web settings. `mapRemoteSnapshot` converts them to local shapes, then
+`reconcileRemoteStore` runs per store: remote values win for columns the shared schema stores,
+web-only fields keep their local value (or a default for new rows), rows with a pending outbox op
+are untouched, local rows missing remotely are deleted unless pending or local-only (transfers).
+Appearance is applied only if no pending preference op. Writes `sync_meta`.
 
 ### `syncNow(ownerId, {client, defaultCurrency, ignoreBackoff})`
 1. No owner → just ensure local defaults, status `local`.
@@ -144,7 +189,9 @@ if no pending preference op. Writes `sync_meta`.
 
 ### Conflict model
 Simple and deliberate: **pending local changes win; otherwise remote wins on pull.** There is no
-field-level merge or version vector. The `updated_at` DB trigger stamps server time on writes.
+field-level merge or version vector. There is **no** `updated_at` trigger on the shared DB; the web
+sets `updated_at` itself from the local edit time, so concurrent edits from mobile and web are
+last-write-wins.
 
 ### Sync status shape
 `{ state: idle|local|syncing|synced|offline|error, pendingCount, lastSyncAt, lastError }`
@@ -187,7 +234,8 @@ migrated for this owner). `migrateGuestToCloud(ownerId)`:
 1. Push outbox + pull remote first (so cloud rows exist locally).
 2. **Accounts** matched by case-insensitive name; never creates a second "Default" or second default flag.
 3. **Categories** matched by `(kind, lower(name))`.
-4. **Transactions** re-pointed to mapped account/category ids; `transfer_group_id` remapped consistently.
+4. **Transactions** re-pointed to mapped account/category ids; `transfer_group_id` remapped consistently
+   (transfers are local-only on the shared schema, so they merge locally but are not uploaded).
 5. **Buckets** matched by `(account, name)`; entries remapped; parent totals recomputed.
 6. **Loan profiles** deduplicated by `(name, loan_date, principal)`.
 7. Deterministic id map is stored (`guest_migration_id_map`) → re-running is idempotent.
@@ -197,7 +245,8 @@ UI entry points: banner in AppShell and `/settings/backup`.
 
 ## 8. Money, dates and rounding conventions
 
-- Amount storage: JS numbers with 2 dp (DB `numeric(18,2)`); **aggregate via minor units**.
+- Amount storage: JS numbers with 2 dp (DB: `float8` for transactions, text for buckets/loans; the
+  mapping layer converts); **aggregate via minor units**.
   Helpers: `round2` (calculatorEngine, budgetMath), `formatMoney` (`utils/currencies.js`),
   `formatPdfMoney` (pdfExport).
 - Zero-decimal currencies: `JPY`, `KRW`, `VND` (formatters round to 0 dp).

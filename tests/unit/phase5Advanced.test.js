@@ -22,67 +22,71 @@ import {
 import {
   migrateGuestToCloud,
   getGuestMigrationSummary,
+  sanitizeForRemote,
 } from "@/lib/syncEngine";
 import { buildDefaultAccount, buildDefaultCategories, generateUuid } from "@/lib/defaultSeeds";
 
+const REMOTE_TABLES = [
+  "accounts",
+  "categories",
+  "transactions",
+  "spend_buckets",
+  "spend_bucket_transactions",
+  "loans",
+  "time_periods",
+  "budget_modes",
+  "carry_overs",
+];
+
+/** In-memory stand-in for the shared (user_id based) Supabase schema. */
 function createMockSupabase(initialRemote = {}) {
-  const remote = {
-    accounts: [...(initialRemote.accounts || [])],
-    categories: [...(initialRemote.categories || [])],
-    transactions: [...(initialRemote.transactions || [])],
-    buckets: [...(initialRemote.buckets || [])],
-    bucket_transactions: [...(initialRemote.bucket_transactions || [])],
-    loan_profiles: [...(initialRemote.loan_profiles || [])],
-    user_preferences: [...(initialRemote.user_preferences || [])],
-  };
+  const remote = {};
+  for (const table of REMOTE_TABLES) {
+    remote[table] = [...(initialRemote[table] || [])];
+  }
 
   const from = (table) => {
+    const filters = [];
+    let rangeFrom = null;
+    let rangeTo = null;
     const chain = {
-      _filters: [],
       select() {
         return chain;
       },
       eq(col, val) {
-        chain._filters.push((row) => row[col] === val);
+        filters.push((row) => row[col] === val);
         return chain;
       },
       is(col, val) {
-        chain._filters.push((row) =>
+        filters.push((row) =>
           val === null ? row[col] == null : row[col] === val,
         );
         return chain;
       },
-      maybeSingle() {
-        const rows = (remote[table] || []).filter((r) =>
-          chain._filters.every((fn) => fn(r)),
-        );
-        return Promise.resolve({ data: rows[0] || null, error: null });
+      order() {
+        return chain;
       },
-      then(resolve) {
-        const rows = (remote[table] || []).filter((r) =>
-          chain._filters.every((fn) => fn(r)),
+      range(a, b) {
+        rangeFrom = a;
+        rangeTo = b;
+        return chain;
+      },
+      then(resolve, reject) {
+        let data = (remote[table] || []).filter((r) =>
+          filters.every((fn) => fn(r)),
         );
-        return Promise.resolve({ data: rows, error: null }).then(resolve);
+        if (rangeFrom !== null) data = data.slice(rangeFrom, rangeTo + 1);
+        return Promise.resolve({ data, error: null }).then(resolve, reject);
       },
       upsert(payload, opts) {
         const conflictKey = opts?.onConflict || "id";
-        // Enforce cloud unique constraints cleanly to prove merge-by-name never collides!
+        // Mirror the shared schema's unique index (user_id, name) WHERE deleted_at IS NULL
+        // to prove merge-by-name never collides.
         if (table === "accounts") {
-          const dupDefault = remote.accounts.find(
-            (a) =>
-              a.owner_id === payload.owner_id &&
-              a.id !== payload.id &&
-              a.is_default &&
-              payload.is_default,
-          );
-          if (dupDefault) {
-            return Promise.resolve({
-              error: { message: "duplicate default account index" },
-            });
-          }
           const dupName = remote.accounts.find(
             (a) =>
-              a.owner_id === payload.owner_id &&
+              !a.deleted_at &&
+              a.user_id === payload.user_id &&
               a.id !== payload.id &&
               a.name.trim().toLowerCase() === payload.name.trim().toLowerCase(),
           );
@@ -92,48 +96,56 @@ function createMockSupabase(initialRemote = {}) {
             });
           }
         }
-        if (table === "categories") {
-          const dupCat = remote.categories.find(
-            (c) =>
-              c.owner_id === payload.owner_id &&
-              c.id !== payload.id &&
-              c.kind === payload.kind &&
-              c.name.trim().toLowerCase() === payload.name.trim().toLowerCase(),
-          );
-          if (dupCat) {
-            return Promise.resolve({
-              error: { message: "duplicate category index" },
-            });
-          }
-        }
         const idx = remote[table].findIndex(
           (r) => r[conflictKey] === payload[conflictKey],
         );
-        if (idx >= 0) remote[table][idx] = payload;
-        else remote[table].push(payload);
+        if (idx >= 0) {
+          remote[table][idx] = { ...remote[table][idx], ...payload };
+        } else {
+          remote[table].push({ ...payload });
+        }
         return Promise.resolve({ error: null });
       },
-      delete() {
-        const deleteChain = {
-          _filters: [],
+      update(patch) {
+        const updateFilters = [];
+        const updateChain = {
           eq(col, val) {
-            deleteChain._filters.push((row) => row[col] === val);
-            if (deleteChain._filters.length >= 2) {
-              remote[table] = remote[table].filter(
-                (r) => !deleteChain._filters.every((fn) => fn(r)),
-              );
-              return Promise.resolve({ error: null });
-            }
-            return deleteChain;
+            updateFilters.push((row) => row[col] === val);
+            return updateChain;
+          },
+          then(resolve, reject) {
+            remote[table] = remote[table].map((r) =>
+              updateFilters.every((fn) => fn(r)) ? { ...r, ...patch } : r,
+            );
+            return Promise.resolve({ error: null }).then(resolve, reject);
           },
         };
-        return deleteChain;
+        return updateChain;
       },
     };
     return chain;
   };
 
   return { client: { from }, remote };
+}
+
+/** Builds the shared-schema rows a mobile app would already have stored. */
+function toCloudRows(ownerId) {
+  const account = {
+    id: generateUuid(),
+    user_id: ownerId,
+    name: "Default",
+    avatar: "avatar1",
+    is_current: true,
+    created_at: "2026-11-20T00:00:00.000Z",
+    updated_at: "2026-11-20T00:00:00.000Z",
+    deleted_at: null,
+  };
+  const localCats = buildDefaultCategories(ownerId);
+  const categories = localCats.map((cat) =>
+    sanitizeForRemote("categories", cat, ownerId),
+  );
+  return { account, categories, localCats };
 }
 
 describe("Phase 5 Receipt OCR Parser", () => {
@@ -289,12 +301,10 @@ describe("Phase 5 Guest-to-Cloud Merge & Deduplication", () => {
   });
 
   it("merges guest data into cloud user that already has 'Default' account + default categories with ZERO duplicates", async () => {
-    // Cloud already has Android-originated Default account + categories
-    const cloudDefaultAcc = {
-      ...buildDefaultAccount(ownerId, "INR"),
-      id: generateUuid(),
-    };
-    const cloudCats = buildDefaultCategories(ownerId);
+    // Cloud already has mobile-originated Default account + categories
+    const cloud = toCloudRows(ownerId);
+    const cloudDefaultAcc = cloud.account;
+    const cloudCats = cloud.categories;
     const { client, remote } = createMockSupabase({
       accounts: [cloudDefaultAcc],
       categories: cloudCats,
@@ -394,23 +404,31 @@ describe("Phase 5 Guest-to-Cloud Merge & Deduplication", () => {
     expect(res.merged.categoriesCreated).toBe(0);
     expect(res.merged.transactionsMigrated).toBe(3);
 
-    // Exactly 2 accounts in cloud ("Default" + "Travel Wallet"), single is_default
+    // Exactly 2 accounts in cloud ("Default" + "Travel Wallet"), single current account
     expect(remote.accounts).toHaveLength(2);
-    expect(remote.accounts.filter((a) => a.is_default)).toHaveLength(1);
+    expect(remote.accounts.filter((a) => a.is_current)).toHaveLength(1);
     // Categories never duplicated (still 21)
     expect(remote.categories).toHaveLength(21);
     // Guest Groceries tx attached to Cloud Groceries ID + Cloud Default Account ID
     const cloudGroceries = cloudCats.find((c) => c.name === "Groceries");
     const migratedGroTx = remote.transactions.find(
-      (t) => t.note === "Groceries before sign in",
+      (t) => t.notes === "Groceries before sign in",
     );
     expect(migratedGroTx.account_id).toBe(cloudDefaultAcc.id);
     expect(migratedGroTx.category_id).toBe(cloudGroceries.id);
+
+    // Transfers have no representation on the shared schema: they stay local-only.
+    expect(remote.transactions).toHaveLength(1);
+    const localTxs = await listEntities(ownerId, "transactions");
+    expect(localTxs.filter((t) => t.transfer_group_id)).toHaveLength(2);
+    // Bucket + entry synced under the shared table names
+    expect(remote.spend_buckets).toHaveLength(1);
+    expect(remote.spend_bucket_transactions).toHaveLength(1);
 
     // Re-running migration stays strictly idempotent (0 duplicates)
     const secondRun = await migrateGuestToCloud(ownerId, client);
     expect(secondRun.merged.transactionsMigrated).toBe(0);
     expect(remote.accounts).toHaveLength(2);
-    expect(remote.transactions).toHaveLength(3);
+    expect(remote.transactions).toHaveLength(1);
   });
 });

@@ -11,6 +11,7 @@ import {
   webOnlyDefaults,
 } from "./remoteSchema";
 import {
+  deleteEntity,
   ensureDefaults,
   ensureDefaultsUnlocked,
   exportOwnerSnapshot,
@@ -332,6 +333,47 @@ export async function pushOutbox(
   return deferred > 0 ? { pushed, failed, deferred } : { pushed, failed };
 }
 
+/**
+ * Default-account de-duplication (shared sync contract): a never-synced local
+ * account with zero transactions/buckets whose name matches a remote account
+ * adopts the remote id, so the unique (user_id, name) index is never violated.
+ */
+async function adoptRemoteAccounts(ownerId, remoteAccounts) {
+  const remoteIds = new Set(remoteAccounts.map((a) => a.id));
+  const remoteNames = new Set(
+    remoteAccounts.map((a) => String(a.name || "").trim().toLowerCase()),
+  );
+  const [localAccounts, transactions, buckets, outbox] = await Promise.all([
+    listEntities(ownerId, "accounts"),
+    listEntities(ownerId, "transactions"),
+    listEntities(ownerId, "buckets"),
+    listOutbox(ownerId),
+  ]);
+
+  const usedAccountIds = new Set([
+    ...transactions.map((t) => t.account_id),
+    ...buckets.map((b) => b.account_id),
+  ]);
+
+  for (const local of localAccounts) {
+    if (remoteIds.has(local.id)) continue;
+    if (local.sync_status === "SYNCED") continue;
+    if (usedAccountIds.has(local.id)) continue;
+    if (!remoteNames.has(String(local.name || "").trim().toLowerCase())) {
+      continue;
+    }
+    await deleteEntity(ownerId, "accounts", local.id, {
+      enqueueSync: false,
+      silent: true,
+    });
+    for (const op of outbox.filter(
+      (o) => o.entity_type === "accounts" && o.entity_id === local.id,
+    )) {
+      await removeOutboxOp(ownerId, op.op_id, "accounts", local.id);
+    }
+  }
+}
+
 export async function pullRemote(
   ownerId,
   client = defaultSupabase,
@@ -393,6 +435,7 @@ export async function pullRemote(
     ...remote,
   });
 
+  await adoptRemoteAccounts(ownerId, mapped.accounts);
   await reconcileRemoteStore(ownerId, "accounts", mapped.accounts, {
     merge: mergeFor("accounts"),
   });
@@ -440,6 +483,16 @@ export async function pullRemote(
   return { pulled: true };
 }
 
+/**
+ * First sync for an owner must pull before it pushes, so a never-synced local
+ * default account can adopt the remote id instead of colliding on upload.
+ */
+async function pullFirstIfNeverSynced(ownerId, client, options) {
+  const meta = await getPreference(ownerId, "sync_meta");
+  if (meta?.initial_pull_done) return;
+  await pullRemote(ownerId, client, options);
+}
+
 function scheduleRetry(ownerId, client, delayMs, defaultCurrency) {
   if (typeof window === "undefined" || !ownerId) return;
   const existingTimer = retryTimers.get(ownerId);
@@ -484,6 +537,7 @@ export async function syncNow(
 
     emitSyncStatus({ state: "syncing", pendingCount: pendingBefore.length });
     try {
+      await pullFirstIfNeverSynced(ownerId, client, { defaultCurrency });
       const pushRes = await pushOutbox(ownerId, client, { ignoreBackoff });
       await pullRemote(ownerId, client, { defaultCurrency });
 
@@ -617,6 +671,7 @@ export async function migrateGuestToCloud(
   return withOwnerLock(ownerId, async () => {
     // 1. Pull latest remote state first when connected
     if (client && (typeof navigator === "undefined" || navigator.onLine !== false)) {
+      await pullFirstIfNeverSynced(ownerId, client);
       await pushOutbox(ownerId, client, { ignoreBackoff: true });
       await pullRemote(ownerId, client);
     }

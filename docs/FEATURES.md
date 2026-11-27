@@ -19,6 +19,10 @@ email + password accounts via Supabase.
   Profile fields are stored in Supabase Auth `user_metadata` (the shared DB has no `profiles`
   table); `authService.profileFromUser` builds the profile object.
 
+**Password reset:** "Forgot password?" on sign-in → `/reset-password` sends `resetPasswordForEmail`;
+the emailed link (Supabase `PASSWORD_RECOVERY` session) returns to the same page to set a new
+password (`requestPasswordReset`, `updateUserPassword`).
+
 **Rules:** password ≥ **12 chars** (client `MIN_PASSWORD_LENGTH` and Supabase config). Guest mode is
 always available even if Supabase env vars are missing (`isSupabaseConfigured` false → guest only).
 Auth session is owned by Supabase (not Redux persist, no cookies).

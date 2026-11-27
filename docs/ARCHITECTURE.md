@@ -17,7 +17,7 @@
 | Drag & drop | `@dnd-kit/*` | Reordering categories/buckets |
 | Icons | `react-icons` (Heroicons v2 `hi2`, Ionicons) + 100+ SVGs in `public/icons/` | |
 | Tests | **Vitest** (jsdom, fake-indexeddb) + **Playwright** | See [DEVELOPMENT.md](./DEVELOPMENT.md) |
-| Hosting | Vercel (`https://spendscope-eta.vercel.app`) | Per `public/sitemap.xml` / `robots.txt` |
+| Hosting | Vercel (`https://spend-scope-mu.vercel.app`) | Per `public/sitemap.xml` / `robots.txt` |
 
 ## 2. High-level picture
 
@@ -81,7 +81,7 @@ spendScope/
 │   ├── migrations/README.md      # intentionally no migrations: DB is owned by the mobile team
 │   └── _archive_old_project/     # old project's + old web v2 schema (reference only)
 ├── tests/
-│   ├── unit/*.test.js            # Vitest (13 files, 95 tests)
+│   ├── unit/*.test.js            # Vitest (13 files, 98 tests)
 │   └── e2e/phase{1..6}-*.spec.mjs# Playwright (6 specs × 3 viewports = 18)
 └── src/
     ├── middleware.js             # legacy-route redirects only (no auth gating — guest-first)
@@ -92,7 +92,7 @@ spendScope/
     │   ├── not-found.jsx         # custom 404
     │   ├── loading.jsx           # root loading (intentionally returns null)
     │   ├── loader-preview/       # dev-only loader showcase
-    │   ├── (public)/             # landing, sign-in, signup, privacy-policy
+    │   ├── (public)/             # landing, sign-in, signup, reset-password, privacy-policy
     │   └── (private)/            # the app: dashboard, transactions, analytics, spend-bucket,
     │                             #   categories, calculators, settings/*   (+ legacy redirects)
     ├── components/
@@ -124,7 +124,7 @@ Route groups: `(public)` and `(private)` are organizational only — **both are 
 | Route | Purpose |
 | --- | --- |
 | `/` , (`/landing` → redirect to `/`) | Marketing landing page (Hero, Calculators, Categories, Features, CTA) |
-| `/sign-in`, `/signup` | Supabase email/password auth; "Continue as Guest" |
+| `/sign-in`, `/signup`, `/reset-password` | Supabase email/password auth, password reset; "Continue as Guest" |
 | `/privacy-policy` | Static policy page |
 | `/dashboard` | Overview: period filter, income/budget vs expense bar, category breakdown, recent transactions |
 | `/transactions` | Full list, search, type/category filters, period filter, export (CSV/PDF), "Show more" paging |

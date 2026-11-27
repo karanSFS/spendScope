@@ -64,7 +64,7 @@ testing from a phone on your network.
 | `phase5Advanced.test.js` | Receipt OCR parser, voice parser, PIN lockout, reminders, guest→cloud merge |
 
 Alias `@` → `src` (vitest config). Setup file loads `fake-indexeddb/auto` and jest-dom matchers.
-State at 2026-11-27: **95 tests passing** (13 files).
+State at 2026-11-27: **98 tests passing** (13 files).
 
 ### End-to-end (`tests/e2e/*.spec.mjs`, Playwright)
 
@@ -101,7 +101,7 @@ for any calculation, sync or money-handling change.
 
 ## 6. Deployment
 
-- Hosted on **Vercel** (`https://spendscope-eta.vercel.app`). Set the two Supabase env vars in the Vercel
+- Hosted on **Vercel** (`https://spend-scope-mu.vercel.app`). Set the two Supabase env vars in the Vercel
   project. Git remote: `origin → github.com/karanSFS/spendScope`.
 - In Supabase Auth settings add the production URL to **Site URL / Redirect URLs** (local config only
   lists `localhost:3000`).

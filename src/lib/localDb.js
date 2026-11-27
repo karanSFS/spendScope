@@ -235,7 +235,9 @@ export async function putEntity(
     id: record.id || generateUuid(),
     owner_id: ownerId || null,
     created_at: record.created_at || nowIso,
-    updated_at: record.updated_at || nowIso,
+    // Every queued write is a new edit: stamp it so last-write-wins sync is correct
+    // even when a caller spreads an old row without refreshing updated_at.
+    updated_at: ownerId && enqueueSync ? nowIso : record.updated_at || nowIso,
     deleted_at: null,
     sync_status: ownerId && enqueueSync ? "PENDING" : ownerId ? "SYNCED" : "LOCAL",
   };
@@ -276,7 +278,7 @@ export async function putEntitiesBatch(
     id: record.id || generateUuid(),
     owner_id: ownerId || null,
     created_at: record.created_at || nowIso,
-    updated_at: record.updated_at || nowIso,
+    updated_at: ownerId && enqueueSync ? nowIso : record.updated_at || nowIso,
     deleted_at: null,
     sync_status: ownerId && enqueueSync ? "PENDING" : ownerId ? "SYNCED" : "LOCAL",
   }));
@@ -413,8 +415,13 @@ export async function markOutboxError(ownerId, opId, errorMessage) {
 }
 
 /**
- * Replaces synced rows from a remote pull without overwriting rows that have
- * pending local edits in sync_outbox.
+ * Replaces synced rows from a remote pull (last-write-wins by `updated_at`).
+ *
+ * - Rows without a pending outbox op: remote replaces local.
+ * - Rows with a pending UPSERT: local is kept unless the remote row is strictly
+ *   newer (`remote.updated_at > local.updated_at`, e.g. edited on mobile in the
+ *   meantime); then remote wins and the stale pending op is dropped.
+ * - Rows with a pending DELETE are never resurrected by a pull.
  *
  * Options:
  * - `merge(localRow | undefined, remoteRow)` builds the stored row. The default
@@ -434,12 +441,13 @@ export async function reconcileRemoteStore(
 
   const tx = db.transaction([storeName, "sync_outbox"], "readwrite");
   const entityStore = tx.objectStore(storeName);
-  const outboxOps = await tx.objectStore("sync_outbox").getAll();
+  const outboxStore = tx.objectStore("sync_outbox");
+  const outboxOps = await outboxStore.getAll();
 
-  const pendingIds = new Set(
+  const pendingOps = new Map(
     outboxOps
       .filter((op) => op.entity_type === storeName)
-      .map((op) => op.entity_id),
+      .map((op) => [op.entity_id, op]),
   );
 
   const remoteMap = new Map();
@@ -452,15 +460,29 @@ export async function reconcileRemoteStore(
   const localRows = await entityStore.getAll();
   const localById = new Map(localRows.map((row) => [row.id, row]));
   for (const localRow of localRows) {
-    if (pendingIds.has(localRow.id)) continue;
+    if (pendingOps.has(localRow.id)) continue;
     if (keepLocal && keepLocal(localRow)) continue;
     if (!remoteMap.has(localRow.id)) {
       await entityStore.delete(localRow.id);
     }
   }
 
+  const toTime = (value) => {
+    const t = Date.parse(value || "");
+    return Number.isFinite(t) ? t : 0;
+  };
+
   for (const [id, remoteRow] of remoteMap.entries()) {
-    if (pendingIds.has(id)) continue;
+    const pendingOp = pendingOps.get(id);
+    if (pendingOp) {
+      const localRow = localById.get(id);
+      const remoteIsNewer =
+        pendingOp.operation === "UPSERT" &&
+        localRow &&
+        toTime(remoteRow.updated_at) > toTime(localRow.updated_at);
+      if (!remoteIsNewer) continue;
+      await outboxStore.delete(pendingOp.op_id);
+    }
     const base = merge ? merge(localById.get(id), remoteRow) : remoteRow;
     await entityStore.put({
       ...base,

@@ -193,6 +193,29 @@ export const updateUserPassword = async (newPassword) => {
 };
 
 /**
+ * Sends the password-reset email (shared auth contract: Email + Password with
+ * resetPasswordForEmail). The link returns to `/reset-password` on this origin;
+ * Supabase only honours origins on the project's redirect allow-list and falls
+ * back to the Site URL otherwise.
+ */
+export const requestPasswordReset = async (email) => {
+  const client = assertSupabase();
+  const cleanEmail = String(email || "").trim();
+  if (!/^\S+@\S+\.\S+$/.test(cleanEmail)) {
+    throw new Error("Please enter a valid email address.");
+  }
+  const redirectTo =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/reset-password`
+      : undefined;
+  const { error } = await client.auth.resetPasswordForEmail(cleanEmail, {
+    redirectTo,
+  });
+  if (error) throw error;
+  return true;
+};
+
+/**
  * Login user and fetch their profile
  */
 export const login = async ({ email, password }) => {

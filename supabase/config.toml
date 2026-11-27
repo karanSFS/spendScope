@@ -5,6 +5,8 @@
 project_id = "bnxqgdsxxakfkcbvkoti"
 
 [auth]
+# Hosted project (dashboard): Site URL https://spend-scope-mu.vercel.app, redirect https://spend-scope-mu.vercel.app/**
+# These local values only affect `supabase start` and are not applied to the hosted project.
 site_url = "http://localhost:3000"
 additional_redirect_urls = ["http://localhost:3000/**", "http://127.0.0.1:3000/**"]
 

@@ -174,6 +174,12 @@ shared database; keep web-only data in Auth `user_metadata`.
   `_archive_old_project/web_v2_owner_id/`; `supabase/migrations/` is intentionally empty.
 - Tests updated (`syncEngine`, `phase5Advanced` guest-merge, `authService`).
 
+**Specification received (same day).** The mobile developers' "Supabase Auth & Offline-First Sync
+Specification" confirmed the project, tables, soft-delete tombstones, push/pull order, LWW and
+default-account dedup. The web was updated to comply: last-write-wins merge, pull-before-push on
+first sync with default-account adoption, password-reset flow, hosted URL
+`https://spend-scope-mu.vercel.app`. Compliance table: [DATA_AND_SYNC.md §3.0](./DATA_AND_SYNC.md#30-official-contract-iosandroidweb-specification).
+
 **Open assumptions (unconfirmed by the mobile developers; isolated in `remoteSchema.js`)**
 1. A transaction's date is `transactions.created_at` (no dedicated date column; back-dating unverified).
 2. Income/expense is determined by `categories.type`.

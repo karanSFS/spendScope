@@ -113,7 +113,7 @@ export default function SignInPage({
           Sign in to SpendScope
         </h1>
         <p className="text-sm text-[var(--home-text-secondary)]">
-          Sync your accounts across Web and Android
+          Sync your accounts across Web, Android and iOS
         </p>
       </div>
 
@@ -187,15 +187,24 @@ export default function SignInPage({
           </div>
         </div>
 
-        <label className="flex items-center gap-2 text-xs font-medium text-[var(--home-text-secondary)] cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={rememberMe}
-            onChange={(e) => setRememberMe(e.target.checked)}
-            className="rounded border-[var(--home-border)] accent-[var(--home-accent)]"
-          />
-          <span>Remember email on this device</span>
-        </label>
+        <div className="flex items-center justify-between gap-3">
+          <label className="flex items-center gap-2 text-xs font-medium text-[var(--home-text-secondary)] cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="rounded border-[var(--home-border)] accent-[var(--home-accent)]"
+            />
+            <span>Remember email on this device</span>
+          </label>
+          <Link
+            href="/reset-password"
+            onClick={onClose}
+            className="text-xs font-semibold text-[var(--home-accent)] hover:underline"
+          >
+            Forgot password?
+          </Link>
+        </div>
 
         <button
           type="submit"
@@ -263,7 +272,7 @@ export default function SignInPage({
     <AuthSplitShell
       eyebrow="WELCOME BACK"
       headline="Pick up right where you left off."
-      subtitle="Sign in to sync your accounts, Spend Buckets, and categories across Web and Android — or jump straight into Guest Mode."
+      subtitle="Sign in to sync your accounts, Spend Buckets, and categories across Web, Android and iOS — or jump straight into Guest Mode."
     >
       {cardContent}
     </AuthSplitShell>

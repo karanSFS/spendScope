@@ -472,4 +472,83 @@ describe("syncEngine (shared user_id schema)", () => {
       amount: "900",
     });
   });
+  it("last-write-wins: newer remote edit replaces a stale pending local edit; newer local edit is kept", async () => {
+    const remoteAcc = (name, updated) => ({
+      id: "acc-lww",
+      user_id: ownerId,
+      name,
+      avatar: "avatar1",
+      is_current: true,
+      created_at: "2026-11-01T00:00:00.000Z",
+      updated_at: updated,
+      deleted_at: null,
+    });
+    const farFuture = "2099-01-01T00:00:00.000Z";
+
+    // Remote edited later than the local pending edit -> remote wins, op dropped.
+    const newer = createMockSupabase({
+      accounts: [remoteAcc("Edited On Mobile", farFuture)],
+      categories: [categoryRow()],
+    });
+    await putEntity(ownerId, "accounts", {
+      id: "acc-lww",
+      name: "Edited On Web",
+      is_default: true,
+    });
+    const { pullRemote } = await import("@/lib/syncEngine");
+    await pullRemote(ownerId, newer.client);
+    expect((await listEntities(ownerId, "accounts"))[0].name).toBe(
+      "Edited On Mobile",
+    );
+    expect(await listOutbox(ownerId)).toHaveLength(0);
+
+    // Local edit is newer than remote -> local stays pending.
+    await deleteOwnerDb(ownerId);
+    const older = createMockSupabase({
+      accounts: [remoteAcc("Old Remote Name", "2020-01-01T00:00:00.000Z")],
+      categories: [categoryRow()],
+    });
+    await putEntity(ownerId, "accounts", {
+      id: "acc-lww",
+      name: "Fresh Web Edit",
+      is_default: true,
+    });
+    await pullRemote(ownerId, older.client);
+    expect((await listEntities(ownerId, "accounts"))[0].name).toBe(
+      "Fresh Web Edit",
+    );
+    expect(await listOutbox(ownerId)).toHaveLength(1);
+  });
+
+  it("adopts the remote id for an unused, never-synced local account with the same name", async () => {
+    const mock = createMockSupabase({
+      accounts: [
+        {
+          id: "remote-default",
+          user_id: ownerId,
+          name: "Default",
+          avatar: "avatar1",
+          is_current: true,
+          created_at: "2026-11-01T00:00:00.000Z",
+          updated_at: "2026-11-01T00:00:00.000Z",
+          deleted_at: null,
+        },
+      ],
+      categories: [categoryRow()],
+    });
+    await putEntity(ownerId, "accounts", {
+      id: "local-default",
+      name: "default",
+      is_default: true,
+    });
+
+    const status = await syncNow(ownerId, { client: mock.client });
+    expect(status.state).toBe("synced");
+
+    const accounts = await listEntities(ownerId, "accounts");
+    expect(accounts.map((a) => a.id)).toEqual(["remote-default"]);
+    // The local duplicate was never uploaded (would violate unique (user_id, name)).
+    expect(mock.remote.accounts).toHaveLength(1);
+    expect(await listOutbox(ownerId)).toHaveLength(0);
+  });
 });

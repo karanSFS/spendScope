@@ -17,7 +17,7 @@ import { changeTheme } from "@/redux/slices/themeSlice";
 const HIGHLIGHTS = [
   {
     icon: HiOutlineCloudArrowUp,
-    title: "Seamless Web & Android Sync",
+    title: "Seamless Web, Android & iOS Sync",
     desc: "Keep accounts, categories, transactions, and Spend Buckets aligned across devices.",
   },
   {
@@ -35,7 +35,7 @@ const HIGHLIGHTS = [
 export default function AuthSplitShell({
   eyebrow = "SPENDSCOPE CLOUD",
   headline = "Calm, private clarity for every account.",
-  subtitle = "Start locally in Guest Mode anytime, or sign in to back up and sync privately across Web and Android.",
+  subtitle = "Start locally in Guest Mode anytime, or sign in to back up and sync privately across Web, Android and iOS.",
   children,
 }) {
   const dispatch = useDispatch();

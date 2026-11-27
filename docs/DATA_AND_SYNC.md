@@ -70,6 +70,37 @@ entity_id, operation, payload, status, attempts, last_error, next_retry_at, …}
 > `supabase/_archive_old_project/web_v2_owner_id/` for history only. **Do not apply it to the shared
 > project.** `supabase/migrations/` is intentionally empty (see its README).
 
+### 3.0 Official contract (iOS/Android/Web specification)
+
+The mobile developers supplied **"SpendScope — Supabase Auth & Offline-First Sync Specification"**
+(received 2026-11-27). It is the contract all three clients follow. Key points and how the web
+complies:
+
+| Contract item | Web status |
+| --- | --- |
+| Project `bnxqgdsxxakfkcbvkoti`, URL and publishable key; never ship `service_role`/`sb_secret_` | ✅ `.env.local` matches; only the publishable key is used |
+| Hosted web URL `https://spend-scope-mu.vercel.app` (Site URL + redirect `…/**` in dashboard) | ✅ sitemap/robots/docs updated; password-reset links return to `/reset-password` |
+| Email + Password: signUp, signIn, **resetPasswordForEmail**, signOut | ✅ reset flow added (`/reset-password`, "Forgot password?" on sign-in) |
+| Sign-up with email confirmation and no session → tell the user to confirm, then sign in | ✅ message shown on the sign-up card |
+| Reuse the exact existing tables/columns; never create duplicate tables | ✅ `remoteSchema.js` only maps; no migrations here |
+| Client UUID primary keys, `updated_at`/`deleted_at` on every entity | ✅ |
+| Deletes are soft-delete UPDATEs (`deleted_at`, `updated_at`) | ✅ (§3.4) |
+| Push order: accounts & categories → time_periods/budget_modes/carry_overs → transactions → repeatings → buckets → bucket entries → loans → tombstones | ✅ (web does not write `carry_overs`/`transaction_repeatings`; tombstones last) |
+| Pull parents→children; **last-write-wins** (`remote.updated_at > local.updated_at`); delete locally when `deleted_at` set | ✅ `reconcileRemoteStore` (pending local edit loses only to a strictly newer remote edit) |
+| Pull incrementally with `updated_at > lastSyncedAt` | ⚠️ Not yet: the web pulls full tables (paginated). Functionally equivalent, heavier on large accounts |
+| Default-account dedup: unused never-synced local default adopts the remote id when names match | ✅ `adoptRemoteAccounts`; first sync pulls **before** pushing (`pullFirstIfNeverSynced`) |
+| Per-user `last_synced_at`, account switching resets state | ✅ Equivalent: one IndexedDB per user (`spendscope_user_<id>`) |
+| Auto-sync on sign-in, reconnect, foreground, debounced saves, manual Sync | ✅ (`online`/`focus`/`visibilitychange`, fire-and-forget push after writes, sync pill) |
+| Password minimum 6 chars (mobile UI) | ⚠️ Web requires **12** on sign-up/reset (stricter); mobile users with shorter passwords can still sign in on web |
+| UI wording: Settings → "Account & Sync" card | Web equivalent lives in Settings → Backup & sync; wording not mirrored |
+
+The specification does **not** define a transaction date column, a kind column, transfers or
+bucket-entry type values, so those remain flagged assumptions (§3.2): with only `created_at` and
+`updated_at` on `transactions`, `created_at` is the only place a mobile date can live.
+
+> A shareable version of these conventions for the mobile developers is in
+> [MOBILE_SYNC_CONVENTIONS.md](./MOBILE_SYNC_CONVENTIONS.md).
+
 ### 3.1 Live tables
 
 All tables: RLS enabled, per-operation policies `(select auth.uid()) = user_id` for role

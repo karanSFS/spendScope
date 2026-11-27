@@ -31,6 +31,7 @@ and is the **web companion to the Android and iOS apps** (the Android source is 
 | [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md) | Change colors, theme, fonts, loaders, 404, or any UI convention |
 | [SECURITY_AND_PRIVACY.md](./SECURITY_AND_PRIVACY.md) | Review auth, RLS, App Lock, what leaves the device, third-party calls |
 | [DEVELOPMENT.md](./DEVELOPMENT.md) | Set up, run, test, build, deploy; env vars; common commands; troubleshooting |
+| [MOBILE_SYNC_CONVENTIONS.md](./MOBILE_SYNC_CONVENTIONS.md) | Share with the Android/iOS devs: the exact conventions the web uses on the shared database, gaps, and optional additive proposals |
 | [HISTORY_AND_DECISIONS.md](./HISTORY_AND_DECISIONS.md) | Learn *why* things are the way they are, past audits/fixes, known issues & tech debt |
 
 ## The 10 rules you must not break
@@ -64,7 +65,7 @@ and is the **web companion to the Android and iOS apps** (the Android source is 
 ```bash
 npm install
 npm run dev          # http://localhost:3000 (Turbopack)
-npm test             # Vitest unit tests (95 tests, 13 files)
+npm test             # Vitest unit tests (98 tests, 13 files)
 npm run lint         # next lint (expected: 0 warnings)
 npm run build        # production build
 npm run test:e2e     # Playwright (builds must exist; runs on port 3005, 3 viewports)

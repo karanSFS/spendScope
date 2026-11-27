@@ -4,6 +4,7 @@ const authMocks = vi.hoisted(() => ({
   signUp: vi.fn(),
   signInWithPassword: vi.fn(),
   signOut: vi.fn(),
+  resetPasswordForEmail: vi.fn(),
   updateUser: vi.fn(),
   from: vi.fn(),
 }));
@@ -15,6 +16,7 @@ vi.mock("@/lib/supabaseconfig", () => ({
       signUp: authMocks.signUp,
       signInWithPassword: authMocks.signInWithPassword,
       signOut: authMocks.signOut,
+      resetPasswordForEmail: authMocks.resetPasswordForEmail,
       updateUser: authMocks.updateUser,
     },
     from: authMocks.from,
@@ -26,6 +28,7 @@ import {
   signUp,
   createOrUpdateProfile,
   profileFromUser,
+  requestPasswordReset,
   getAuthErrorMessage,
 } from "@/services/authService";
 
@@ -110,5 +113,17 @@ describe("authService v2 policy & profile schema", () => {
         message: "Password should be at least 12 characters",
       }),
     ).toBe("Password must be at least 12 characters.");
+  });
+
+  it("sends a password-reset email that returns to /reset-password", async () => {
+    authMocks.resetPasswordForEmail.mockResolvedValue({ error: null });
+    await expect(requestPasswordReset(" alex@example.com ")).resolves.toBe(true);
+    expect(authMocks.resetPasswordForEmail).toHaveBeenCalledWith(
+      "alex@example.com",
+      { redirectTo: `${window.location.origin}/reset-password` },
+    );
+    await expect(requestPasswordReset("not-an-email")).rejects.toThrow(
+      "valid email",
+    );
   });
 });

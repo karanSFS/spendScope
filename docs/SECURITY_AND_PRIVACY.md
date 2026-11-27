@@ -33,6 +33,8 @@ Preferences that never leave the device: `app_lock` (PIN hash, salt, lockout sta
   writes rows belonging to the signed-in user.
 - Web-only settings and the profile live in Auth `user_metadata` (user-writable, included in the
   JWT). Never store secrets there.
+- Password policy: web requires ≥ 12 characters on sign-up and reset (stricter than the 6-character
+  mobile UI minimum); sign-in never enforces a minimum.
 - Security advisor (2026-11-27): leaked-password protection is **disabled** in the Supabase dashboard
   (Auth → password security); enabling it is recommended.
 - Use the Supabase advisors (security + performance) after any schema change.
